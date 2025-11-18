@@ -9,6 +9,7 @@ import {
   listCachedLibraries,
   log
 } from './utils.js';
+import { detectDependencies, getSuggestions } from './detect-dependencies.js';
 
 const program = new Command();
 
@@ -75,9 +76,128 @@ async function updateDocs(library, options) {
 
     log(`\\n✓ Update complete\\n`, 'info');
 
+  } else if (options.project) {
+    // Update project dependencies
+    await updateProjectDocs(options.path || process.cwd(), config);
   } else {
-    throw new Error('Please specify a library name or use --all to update everything');
+    throw new Error('Please specify a library name, use --all, or use --project');
   }
+}
+
+/**
+ * Update documentation for project dependencies
+ */
+async function updateProjectDocs(projectPath, config) {
+  log(`\\nDetecting project dependencies...\\n`, 'info');
+
+  const detection = await detectDependencies(projectPath);
+
+  if (!detection.ecosystem) {
+    console.log('No supported dependency files found in project.\\n');
+    return;
+  }
+
+  const suggestions = getSuggestions(detection);
+
+  // Count what needs updating/fetching
+  const needsAction = suggestions.toUpdate.length + suggestions.toFetch.length;
+
+  if (needsAction === 0) {
+    log('✓ All project dependencies are cached and current!\\n', 'info');
+    return;
+  }
+
+  log(`Found ${needsAction} ${needsAction === 1 ? 'library' : 'libraries'} that need attention:\\n`, 'info');
+
+  // Show what will be done
+  if (suggestions.toFetch.length > 0) {
+    console.log(`Will fetch (${suggestions.toFetch.length}):`);
+    suggestions.toFetch.forEach(item => {
+      console.log(`  - ${item.library} v${item.version}`);
+    });
+    console.log('');
+  }
+
+  if (suggestions.toUpdate.length > 0) {
+    console.log(`Will update (${suggestions.toUpdate.length}):`);
+    suggestions.toUpdate.forEach(item => {
+      console.log(`  - ${item.library} (${item.cached} → ${item.required})`);
+    });
+    console.log('');
+  }
+
+  // Fetch missing documentation
+  for (const item of suggestions.toFetch) {
+    try {
+      log(`\\n--- Fetching ${item.library} v${item.version} ---`, 'info');
+
+      const dep = detection.dependencies.find(
+        d => d.normalizedName === item.library
+      );
+
+      // Try to construct a documentation URL
+      const docUrl = guessDocUrl(item.library);
+
+      await fetchDocumentation(item.library, item.version, {
+        url: docUrl
+      });
+
+      // Generate skill if auto-enabled
+      if (config.auto_generate_skills) {
+        await generateSkill(item.library, item.version, {});
+      }
+
+      log(`✓ ${item.library} fetched successfully`, 'info');
+    } catch (error) {
+      log(`✗ Failed to fetch ${item.library}: ${error.message}`, 'error');
+      log(`  Try manually: /fetch-docs ${item.library} --url <docs-url>`, 'info');
+    }
+  }
+
+  // Update outdated documentation
+  for (const item of suggestions.toUpdate) {
+    try {
+      log(`\\n--- Updating ${item.library} ---`, 'info');
+
+      const cached = detection.cachedLibraries.find(
+        lib => lib.name === item.library
+      );
+
+      if (cached) {
+        await fetchDocumentation(item.library, item.required, {
+          url: cached.metadata.source_url
+        });
+
+        if (cached.metadata.skill_generated) {
+          await generateSkill(item.library, item.required, {});
+        }
+
+        log(`✓ ${item.library} updated`, 'info');
+      }
+    } catch (error) {
+      log(`✗ Failed to update ${item.library}: ${error.message}`, 'error');
+    }
+  }
+
+  log(`\\n✓ Project documentation update complete\\n`, 'info');
+}
+
+/**
+ * Guess documentation URL from library name
+ */
+function guessDocUrl(library) {
+  const commonUrls = {
+    'nextjs': 'https://nextjs.org/docs',
+    'react': 'https://react.dev',
+    'vue': 'https://vuejs.org/guide',
+    'supabase': 'https://supabase.com/docs',
+    'tailwind': 'https://tailwindcss.com/docs',
+    'django': 'https://docs.djangoproject.com',
+    'flask': 'https://flask.palletsprojects.com',
+    'fastapi': 'https://fastapi.tiangolo.com'
+  };
+
+  return commonUrls[library] || `https://${library}.dev/docs`;
 }
 
 /**
@@ -88,6 +208,8 @@ program
   .description('Update cached documentation to latest version')
   .argument('[library]', 'Library name to update (e.g., nextjs)')
   .option('-a, --all', 'Update all cached documentation')
+  .option('-p, --project', 'Update documentation for current project dependencies')
+  .option('--path <path>', 'Project path (for --project flag)', process.cwd())
   .option('--force', 'Force re-fetch even if recently updated')
   .action(async (library, options) => {
     try {
