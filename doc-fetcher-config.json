@@ -1,0 +1,21 @@
+{
+  "cache_directory": ".claude/docs",
+  "auto_generate_skills": true,
+  "auto_detect_dependencies": true,
+  "remote_sync": false,
+  "remote_sync_url": "https://squirrelsoft.dev/api/docs",
+  "crawl_delay_ms": 1000,
+  "max_pages_per_fetch": 500,
+  "frameworks_priority": [
+    "llms.txt",
+    "claude.txt",
+    "sitemap.xml",
+    "docusaurus",
+    "vitepress",
+    "nextra"
+  ],
+  "user_agent": "Claude Code Doc Fetcher/1.0",
+  "respect_robots_txt": true,
+  "max_retries": 3,
+  "timeout_ms": 30000
+}
