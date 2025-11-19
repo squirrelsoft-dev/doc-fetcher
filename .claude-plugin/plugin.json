@@ -1,28 +1,35 @@
 {
-  "name": "doc-fetcher",
-  "version": "1.1.0",
-  "description": "Fetches, caches, and versions documentation from web sources to provide accurate, version-specific context for AI coding agents",
-  "author": {
-    "name": "Squirrelsoft Dev Tools",
-    "url": "https://squirrelsoft.dev"
-  },
-  "repository": "https://github.com/squirrelsoft-dev/doc-fetcher",
-  "skills": [
-    "./skills/doc-indexer",
-    "./skills/llms-txt-finder",
-    "./skills/doc-skill-generator",
-    "./skills/dependency-detector"
-  ],
-  "commands": [
-    "./commands/fetch-docs.md",
-    "./commands/update-docs.md",
-    "./commands/list-docs.md",
-    "./commands/generate-skill.md"
-  ],
-  "agents": [
-    "./agents/doc-crawler.md"
-  ],
-  "keywords": ["documentation", "docs", "versioning", "cache", "AI", "context"],
-  "license": "MIT",
-  "homepage": "https://github.com/squirrelsoft-dev/doc-fetcher"
+    "name": "doc-fetcher",
+    "version": "1.6.0",
+    "description": "Fetches, caches, and versions documentation from web sources to provide accurate, version-specific context for AI coding agents",
+    "author": {
+        "name": "Squirrelsoft Dev Tools",
+        "url": "https://squirrelsoft.dev"
+    },
+    "repository": "https://github.com/squirrelsoft-dev/doc-fetcher",
+    "skills": [
+        "./skills/doc-indexer",
+        "./skills/llms-txt-finder",
+        "./skills/doc-skill-generator",
+        "./skills/dependency-detector"
+    ],
+    "commands": [
+        "./commands/fetch-docs.md",
+        "./commands/update-docs.md",
+        "./commands/list-docs.md",
+        "./commands/generate-skill.md"
+    ],
+    "agents": [
+        "./agents/doc-crawler.md"
+    ],
+    "keywords": [
+        "documentation",
+        "docs",
+        "versioning",
+        "cache",
+        "AI",
+        "context"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/squirrelsoft-dev/doc-fetcher"
 }

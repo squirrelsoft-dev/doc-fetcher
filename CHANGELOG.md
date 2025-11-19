@@ -8,12 +8,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Enhanced error recovery (pause/resume for crawls)
 - JavaScript rendering (Playwright/Puppeteer integration)
 - Authentication support for private docs
 - Remote sync to squirrelsoft.dev
 - Embeddings for semantic search within docs
 - Auto-update scheduler
+
+## [1.6.0] - 2025-01-18
+
+### Added - Enhanced Error Recovery 🔄
+
+- **Error Categorization Module** 🏷️
+  - New `error-utils.js` module for intelligent error handling
+  - Categorizes errors: RATE_LIMIT (429), RETRYABLE (5xx, network), PERMANENT (404, 403)
+  - HTTP status code detection (429, 500-599, 404, 403, etc.)
+  - Network error detection (ECONNREFUSED, ETIMEDOUT, ENOTFOUND, etc.)
+  - 48 comprehensive unit tests (100% passing)
+
+- **Adaptive Backoff Strategy** ⏱️
+  - Exponential backoff with jitter (prevents thundering herd)
+  - Base delay: 1s → 30s maximum (2^retryCount capped)
+  - Respects `Retry-After` headers for 429 responses
+  - Parses both delay-seconds and HTTP-date formats
+  - Error-specific delay calculation
+
+- **Checkpoint System** 💾
+  - New `checkpoint-manager.js` module for resume capability
+  - Auto-saves progress every 10 pages (configurable)
+  - Detects interrupted fetches on restart
+  - Resume from last successful page
+  - Checkpoint file: `.checkpoint.json` with version tracking
+  - 27 unit tests for checkpoint logic (100% passing)
+
+- **Resume Functionality** ▶️
+  - Automatic interruption detection on fetch/update start
+  - Loads checkpoint and skips completed pages
+  - Displays checkpoint info (progress, age, stats)
+  - Works for both `/fetch-docs` and `/update-docs`
+  - Deletes checkpoint on successful completion
+  - `--force` flag bypasses checkpoint and starts fresh
+
+- **Detailed Error Reporting** 📊
+  - Error summary by category (rate limit, permanent, retryable)
+  - Failed URL listing with error messages
+  - Suggested actions for each error type
+  - User-friendly error formatting with emojis
+  - Categorized error tracking in crawl results
+
+- **Enhanced fetchHtml()** 🌐
+  - Detects all HTTP status codes (not just network errors)
+  - Returns categorized error information
+  - Retries only on retryable errors
+  - Better retry logging with error categories
+  - Validates responses before treating as success
+
+- **Configuration Options** ⚙️
+  - `enable_checkpoints`: Enable/disable checkpoint system (default: true)
+  - `checkpoint_interval`: Pages between checkpoints (default: 10)
+  - `checkpoint_max_age_days`: Stale checkpoint threshold (default: 7)
+
+### Changed
+
+- **Retry Logic** 🔁
+  - Smart retry decisions based on error category
+  - No retries for permanent errors (404, 403)
+  - Adaptive backoff replaces simple linear delays
+  - Better logging during retries (shows error type)
+
+- **crawlPages() Function** 🕷️
+  - Now accepts `enableCheckpoint` and `checkpointData` options
+  - Tracks failed pages with full error details
+  - Saves checkpoints periodically during crawl
+  - Skips already-completed pages on resume
+  - Enhanced results with error categorization
+
+- **Test Coverage** ✅
+  - Total: 274 tests (all passing) - up from 199 tests
+  - Added 48 error-utils tests
+  - Added 27 checkpoint-manager tests
+  - Comprehensive edge case coverage
+
+### Impact
+
+- **Data Loss Prevention** 💪
+  - Never lose progress on interrupted crawls (500+ pages)
+  - Resume from network failures, timeouts, or manual interruption
+  - Saves hours of re-crawling time
+
+- **Rate Limit Handling** ⏰
+  - Graceful handling of 429 responses
+  - Prevents IP bans with proper backoff
+  - Respects server Retry-After headers
+
+- **Better User Experience** 😊
+  - Clear error messages with actionable suggestions
+  - Progress visibility through checkpoints
+  - Automatic recovery without user intervention
+  - Bandwidth savings from not re-fetching completed pages
 
 ## [1.5.0] - 2025-01-18
 

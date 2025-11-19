@@ -30,11 +30,28 @@ import {
   formatValidationError,
   ValidationError
 } from './validate.js';
+import {
+  categorizeError,
+  adaptiveBackoff,
+  shouldRetry,
+  summarizeErrors,
+  formatErrorMessage
+} from './error-utils.js';
+import {
+  saveCheckpoint,
+  loadCheckpoint,
+  deleteCheckpoint,
+  updateCheckpointProgress,
+  detectInterruptedFetch,
+  createInitialCheckpoint,
+  formatCheckpointInfo
+} from './checkpoint-manager.js';
 
 const program = new Command();
 
 /**
- * Fetch HTML content from URL
+ * Fetch HTML content from URL with enhanced error handling
+ * Supports HTTP status detection, adaptive backoff, and categorized errors
  */
 async function fetchHtml(url, config, retryCount = 0) {
   try {
@@ -42,23 +59,52 @@ async function fetchHtml(url, config, retryCount = 0) {
       timeout: config.timeout_ms,
       headers: {
         'User-Agent': config.user_agent
-      }
+      },
+      // Don't throw on non-2xx status codes, handle them explicitly
+      validateStatus: (status) => status < 600
     });
 
-    return {
-      success: true,
-      html: response.data
-    };
-  } catch (error) {
-    if (retryCount < config.max_retries) {
-      log(`  Retry ${retryCount + 1}/${config.max_retries} for ${url}`, 'warn');
-      await sleep(1000 * (retryCount + 1)); // Exponential backoff
-      return fetchHtml(url, config, retryCount + 1);
+    // Check for non-success status codes
+    if (response.status >= 400) {
+      const error = new Error(`HTTP ${response.status}`);
+      error.response = response;
+      throw error;
     }
 
     return {
+      success: true,
+      html: response.data,
+      statusCode: response.status
+    };
+  } catch (error) {
+    // Categorize the error
+    const categorized = categorizeError(error);
+
+    // Check if we should retry
+    if (shouldRetry(categorized, retryCount, config.max_retries)) {
+      // Calculate adaptive backoff delay
+      const delay = adaptiveBackoff(retryCount, categorized);
+
+      // Log retry attempt with error category
+      const retryInfo = categorized.category === 'RATE_LIMIT'
+        ? `Rate limited, waiting ${Math.floor(delay / 1000)}s`
+        : `${categorized.message}`;
+
+      log(`  Retry ${retryCount + 1}/${config.max_retries} for ${url.substring(0, 60)}... (${retryInfo})`, 'warn');
+
+      await sleep(delay);
+      return fetchHtml(url, config, retryCount + 1);
+    }
+
+    // Max retries exceeded or permanent error
+    return {
       success: false,
-      error: error.message
+      error: categorized.message || error.message,
+      errorCategory: categorized.category,
+      retryable: categorized.retryable,
+      statusCode: categorized.statusCode,
+      retryAfter: categorized.retryAfter,
+      suggestedAction: categorized.suggestedAction
     };
   }
 }
@@ -103,18 +149,42 @@ ${markdown}`;
  * @param {Object} robotsChecker - RobotsChecker instance
  * @param {Object} [options] - Crawl options
  * @param {Set<string>} [options.pageFilter] - Set of URLs to fetch (if provided, only these will be fetched)
+ * @param {boolean} [options.enableCheckpoint] - Enable checkpoint saving for resume capability
+ * @param {Object} [options.checkpointData] - Existing checkpoint data to resume from
  * @returns {Promise<Object>} Crawl results
  */
 async function crawlPages(urlEntries, libraryPath, config, robotsChecker, options = {}) {
-  const { pageFilter } = options;
+  const { pageFilter, enableCheckpoint = false, checkpointData = null } = options;
 
   const results = {
     successful: 0,
     failed: 0,
     skipped: 0,
     totalSize: 0,
-    pages: []
+    pages: [],
+    failedPages: [],      // Track failed pages with error details
+    rateLimited: false,   // Flag if we hit rate limiting
+    rateLimitInfo: null,  // Rate limit details (retry-after, etc.)
+    resumed: false        // Flag if this was a resumed crawl
   };
+
+  // Load checkpoint if resuming
+  let checkpoint = checkpointData;
+  let completedUrls = new Set();
+
+  if (checkpoint) {
+    log(`\n🔄 Resuming from checkpoint: ${checkpoint.completedPages}/${checkpoint.totalPages} pages completed`, 'info');
+    results.resumed = true;
+
+    // Build set of completed URLs for fast lookup
+    completedUrls = new Set(checkpoint.completed.map(p => p.url));
+
+    // Restore previous results
+    results.successful = checkpoint.completedPages || 0;
+    results.failed = checkpoint.failedPages || 0;
+    results.pages = checkpoint.completed || [];
+    results.failedPages = checkpoint.failed || [];
+  }
 
   const limit = pLimit(5); // Limit concurrent requests
 
@@ -125,6 +195,15 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
       const url = typeof entry === 'string' ? entry : entry.loc;
       return pageFilter.has(url);
     });
+  }
+
+  // Filter out already-completed URLs from checkpoint
+  if (completedUrls.size > 0) {
+    entriesToProcess = entriesToProcess.filter(entry => {
+      const url = typeof entry === 'string' ? entry : entry.loc;
+      return !completedUrls.has(url);
+    });
+    log(`   Skipping ${completedUrls.size} already-completed pages`, 'info');
   }
 
   // Limit number of pages if configured
@@ -163,7 +242,27 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
       const fetchResult = await fetchHtml(url, config);
 
       if (!fetchResult.success) {
+        // Track failed page with error details
         results.failed++;
+        results.failedPages.push({
+          url,
+          error: fetchResult.error,
+          errorCategory: fetchResult.errorCategory,
+          statusCode: fetchResult.statusCode,
+          retryable: fetchResult.retryable,
+          suggestedAction: fetchResult.suggestedAction
+        });
+
+        // Special handling for rate limit errors
+        if (fetchResult.errorCategory === 'RATE_LIMIT') {
+          results.rateLimited = true;
+          results.rateLimitInfo = {
+            retryAfter: fetchResult.retryAfter,
+            url: url
+          };
+          log(`  ⏱️  Rate limit detected on ${url.substring(0, 50)}...`, 'warn');
+        }
+
         progress.increment();
         return null;
       }
@@ -188,13 +287,27 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
 
         results.successful++;
         results.totalSize += pageInfo.size;
-        results.pages.push({
+        const pageData = {
           url,
           title: extractResult.metadata.title,
           filename: pageInfo.filename,
           size: pageInfo.size,
           ...urlMetadata  // Include sitemap metadata (lastmod, changefreq, priority)
-        });
+        };
+        results.pages.push(pageData);
+
+        // Save checkpoint periodically if enabled
+        if (enableCheckpoint && checkpoint) {
+          const totalPages = checkpoint.totalPages || urlEntries.length;
+          await updateCheckpointProgress(libraryPath, checkpoint, {
+            completedPages: results.successful,
+            completed: results.pages,
+            failed: results.failedPages,
+            pending: [], // Could track pending if needed
+            rateLimit: results.rateLimited ? results.rateLimitInfo : null
+          });
+          checkpoint.completedPages = results.successful; // Update in-memory checkpoint
+        }
 
         progress.increment();
         return pageInfo;
@@ -208,6 +321,53 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
   );
 
   await Promise.all(tasks);
+
+  // Display error summary if there were failures
+  if (results.failedPages.length > 0) {
+    const summary = summarizeErrors(results.failedPages.map(fp => ({
+      url: fp.url,
+      error: {
+        category: fp.errorCategory,
+        message: fp.error,
+        statusCode: fp.statusCode,
+        retryable: fp.retryable,
+        suggestedAction: fp.suggestedAction
+      }
+    })));
+
+    log('\n📊 Error Summary:', 'warn');
+    log(`   Total failures: ${summary.total}`, 'warn');
+    if (summary.byCategory.RATE_LIMIT > 0) {
+      log(`   Rate limited: ${summary.byCategory.RATE_LIMIT}`, 'warn');
+    }
+    if (summary.byCategory.PERMANENT > 0) {
+      log(`   Permanent errors (404, 403, etc.): ${summary.byCategory.PERMANENT}`, 'warn');
+    }
+    if (summary.byCategory.RETRYABLE > 0) {
+      log(`   Temporary errors (500, network, etc.): ${summary.byCategory.RETRYABLE}`, 'warn');
+    }
+
+    // Show details for first few failures
+    if (results.failedPages.length <= 5) {
+      log('\n   Failed URLs:', 'warn');
+      results.failedPages.forEach(fp => {
+        log(`   • ${fp.url.substring(0, 60)}${fp.url.length > 60 ? '...' : ''}`, 'warn');
+        log(`     ${fp.error} (${fp.errorCategory})`, 'warn');
+      });
+    }
+  }
+
+  // Delete checkpoint if crawl completed successfully
+  if (enableCheckpoint && checkpoint) {
+    const allPagesProcessed = results.successful + results.failed + results.skipped;
+    const totalExpected = checkpoint.totalPages || urlEntries.length;
+
+    // Consider it complete if we processed all expected pages (even if some failed)
+    if (allPagesProcessed >= entriesToProcess.length) {
+      await deleteCheckpoint(libraryPath);
+      log('\n✅ Checkpoint deleted - crawl completed', 'info');
+    }
+  }
 
   return results;
 }
@@ -236,9 +396,32 @@ async function fetchDocumentation(library, version, options) {
   // Load config
   const config = await loadConfig();
   const cacheDir = config.cache_directory || getCacheDir();
+  const libraryPath = path.join(cacheDir, library, version || 'latest');
+
+  // Check for interrupted fetch (unless force flag is set)
+  let resumeCheckpoint = null;
+  const enableCheckpoint = config.enable_checkpoints !== false; // Default true
+
+  if (enableCheckpoint && !options.force) {
+    const interruptionCheck = await detectInterruptedFetch(libraryPath);
+
+    if (interruptionCheck.interrupted && interruptionCheck.canResume) {
+      log(`\\n🔄 Detected interrupted fetch!`, 'warn');
+      log(formatCheckpointInfo(interruptionCheck.checkpoint), 'info');
+
+      // Load checkpoint for resume
+      resumeCheckpoint = interruptionCheck.checkpoint || await loadCheckpoint(libraryPath);
+
+      if (resumeCheckpoint) {
+        log(`\\n▶️  Resuming from checkpoint...`, 'info');
+      } else {
+        log(`   Unable to load checkpoint, will start fresh`, 'warn');
+      }
+    }
+  }
 
   // Determine documentation URL
-  const docUrl = options.url || `https://${library}.dev/docs`;
+  const docUrl = options.url || resumeCheckpoint?.metadata?.sourceUrl || `https://${library}.dev/docs`;
   log(`Documentation URL: ${docUrl}`, 'info');
 
   // 0. Initialize robots.txt checker
@@ -285,9 +468,26 @@ async function fetchDocumentation(library, version, options) {
 
       log(`Found ${urlEntries.length} documentation pages`, 'info');
 
+      // Create initial checkpoint if enabled and not resuming
+      if (enableCheckpoint && !resumeCheckpoint) {
+        await createInitialCheckpoint(libraryPath, {
+          operation: 'fetch',
+          library,
+          version: version || 'latest',
+          totalPages: urlEntries.length,
+          urls: urlEntries.map(e => typeof e === 'string' ? e : e.loc),
+          sourceUrl: docUrl,
+          framework: null // Will be detected during extraction
+        });
+        resumeCheckpoint = await loadCheckpoint(libraryPath);
+      }
+
       // 3. Crawl pages
       log('\\n[4/7] Crawling documentation pages...', 'info');
-      const crawlResults = await crawlPages(urlEntries, path.join(cacheDir, library, version || 'latest'), config, robotsChecker);
+      const crawlResults = await crawlPages(urlEntries, libraryPath, config, robotsChecker, {
+        enableCheckpoint,
+        checkpointData: resumeCheckpoint
+      });
 
       pages = crawlResults.pages;
 
@@ -306,7 +506,7 @@ async function fetchDocumentation(library, version, options) {
 
   // 4. Create cache directory structure
   log('\\n[5/7] Saving to cache...', 'info');
-  const libraryPath = getLibraryPath(cacheDir, library, version || 'latest');
+  // libraryPath already defined earlier
   await ensureDir(libraryPath);
   await ensureDir(path.join(libraryPath, 'pages'));
 

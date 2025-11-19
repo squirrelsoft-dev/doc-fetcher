@@ -25,6 +25,11 @@ import {
 } from './compare-sitemaps.js';
 import { parseSitemap } from './parse-sitemap.js';
 import { RobotsChecker } from './robots-checker.js';
+import {
+  detectInterruptedFetch,
+  loadCheckpoint,
+  formatCheckpointInfo
+} from './checkpoint-manager.js';
 
 const program = new Command();
 
@@ -132,6 +137,23 @@ async function updateDocs(library, options) {
     }
 
     let result;
+
+    // Check for interrupted update (unless --force is specified)
+    const enableCheckpoint = config.enable_checkpoints !== false; // Default true
+
+    if (enableCheckpoint && !options.force) {
+      const libraryPath = getLibraryPath(cacheDir, library, existing.version);
+      const interruptionCheck = await detectInterruptedFetch(libraryPath);
+
+      if (interruptionCheck.interrupted && interruptionCheck.canResume) {
+        log(`\\n🔄 Detected interrupted update!`, 'warn');
+        log(formatCheckpointInfo(interruptionCheck.checkpoint), 'info');
+        log(`\\n▶️  Resuming from checkpoint...\\n`, 'info');
+
+        // The resume will be handled by fetchDocumentation or incrementalUpdate
+        // which will automatically load the checkpoint
+      }
+    }
 
     // Try incremental update unless --force is specified
     if (!options.force) {

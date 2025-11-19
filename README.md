@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -21,6 +21,7 @@ AI coding agents frequently struggle with:
 - **AI-First**: Checks for `llms.txt` and `claude.txt` before web crawling
 - **Smart Crawling**: Auto-detects documentation frameworks (Docusaurus, VitePress, Nextra, GitBook, etc.)
 - **Robots.txt Compliance**: Respects webmaster preferences, honors crawl delays, prevents IP bans
+- **Enhanced Error Recovery**: Automatic checkpoint/resume for interrupted crawls, intelligent retry with adaptive backoff
 - **Version Management**: Cache multiple versions, pin to project dependencies
 - **Auto-Generated Skills**: Automatically creates Claude Code skills from cached docs
 - **Project Integration**: Detects dependencies from `package.json` and suggests fetching relevant docs
@@ -28,6 +29,25 @@ AI coding agents frequently struggle with:
 - **Offline-Ready**: Documentation works without internet once cached
 
 ## Recent Updates
+
+### v1.6.0 (2025-01-18)
+
+#### Added
+- **Enhanced Error Recovery** - Robust error handling with automatic recovery
+  - **Checkpoint/Resume System**: Auto-saves progress every 10 pages, resume from interruptions
+  - **Intelligent Error Categorization**: Distinguishes rate limits (429), retryable (5xx, network), and permanent errors (404, 403)
+  - **Adaptive Backoff**: Exponential backoff with jitter (1s → 30s max), respects `Retry-After` headers
+  - **Automatic Interruption Detection**: Detects partial fetches and offers to resume on next run
+  - **Detailed Error Reporting**: Error summaries by category with suggested actions
+  - **Rate Limit Handling**: Graceful 429 response handling prevents IP bans
+  - **Configuration Options**: `enable_checkpoints`, `checkpoint_interval`, `checkpoint_max_age_days`
+  - **75 New Tests**: Comprehensive unit tests for error-utils (48) and checkpoint-manager (27)
+  - **Total: 274 tests** (all passing)
+
+#### Impact
+- **Data Loss Prevention**: Never lose progress on interrupted crawls (500+ pages)
+- **Better Reliability**: Automatic recovery from network failures and timeouts
+- **Professional Crawling**: Proper rate limit handling with server-specified retry delays
 
 ### v1.5.0 (2025-01-18)
 
@@ -539,7 +559,10 @@ Create or edit `doc-fetcher-config.json` in your plugin directory:
   "user_agent": "Claude Code Doc Fetcher/1.0",
   "respect_robots_txt": true,
   "max_retries": 3,
-  "timeout_ms": 30000
+  "timeout_ms": 30000,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "checkpoint_max_age_days": 7
 }
 ```
 

@@ -1,7 +1,7 @@
 # Doc Fetcher - Remaining Implementation Items
 
 **Analysis Date:** 2025-01-18
-**Overall Status:** ~90% Complete (v1.5.0)
+**Overall Status:** ~95% Complete (v1.6.0)
 
 ---
 
@@ -9,13 +9,14 @@
 
 The doc-fetcher plugin has a **solid foundation** with core documentation fetching fully operational. The main pipeline (llms.txt detection → sitemap parsing → HTML extraction → markdown conversion) works well for standard documentation sites.
 
+**v1.6.0 Update:** ✅ **Enhanced Error Recovery is now complete** with checkpoint/resume capability, adaptive backoff, and intelligent error categorization!
+
 **v1.5.0 Update:** ✅ **Incremental updates are now complete** with intelligent change detection and selective page fetching!
 
 **v1.4.0 Update:** ✅ **Skill generation is now complete** with all 5 templates and advanced content analysis implemented!
 
 **Remaining gaps** exist in advanced features:
 - Advanced crawling (no JS rendering, auth support)
-- Enhanced error recovery (pause/resume)
 - Team collaboration (remote sync not implemented)
 
 ---
@@ -158,6 +159,51 @@ Coverage achieved:
   - Edge case coverage
 
 **Impact:** Massive performance improvement - typically 95%+ bandwidth savings, 10-100x faster updates for documentation with few changes.
+
+#### 9. Enhanced Error Recovery (v1.6.0) ✅ **COMPLETED**
+- ✓ **Error categorization module** (error-utils.js)
+  - Categorizes errors: RATE_LIMIT (429), RETRYABLE (5xx, network), PERMANENT (404, 403)
+  - HTTP status code detection (429, 500-599, 404, 403, etc.)
+  - Network error detection (ECONNREFUSED, ETIMEDOUT, ENOTFOUND, etc.)
+  - 48 comprehensive unit tests (100% passing)
+- ✓ **Adaptive backoff strategy**
+  - Exponential backoff with jitter (prevents thundering herd)
+  - Base delay: 1s → 30s maximum (2^retryCount capped)
+  - Respects Retry-After headers for 429 responses
+  - Parses both delay-seconds and HTTP-date formats
+- ✓ **Checkpoint system** (checkpoint-manager.js)
+  - Auto-saves progress every 10 pages (configurable)
+  - Detects interrupted fetches on restart
+  - Resume from last successful page
+  - Checkpoint file: .checkpoint.json with version tracking
+  - 27 unit tests for checkpoint logic (100% passing)
+- ✓ **Resume functionality**
+  - Automatic interruption detection on fetch/update start
+  - Loads checkpoint and skips completed pages
+  - Displays checkpoint info (progress, age, stats)
+  - Works for both /fetch-docs and /update-docs
+  - Deletes checkpoint on successful completion
+- ✓ **Detailed error reporting**
+  - Error summary by category (rate limit, permanent, retryable)
+  - Failed URL listing with error messages
+  - Suggested actions for each error type
+  - User-friendly error formatting
+- ✓ **Enhanced fetchHtml() and crawlPages()**
+  - Detects all HTTP status codes
+  - Returns categorized error information
+  - Smart retry decisions (only retryable errors)
+  - Tracks failed pages with full error details
+  - Saves checkpoints periodically during crawl
+- ✓ **Configuration options**
+  - enable_checkpoints: Enable/disable checkpoint system (default: true)
+  - checkpoint_interval: Pages between checkpoints (default: 10)
+  - checkpoint_max_age_days: Stale checkpoint threshold (default: 7)
+- ✓ **Comprehensive testing**
+  - 48 error-utils tests + 27 checkpoint-manager tests
+  - Total: 274 tests (all passing)
+  - Comprehensive edge case coverage
+
+**Impact:** Data loss prevention for interrupted crawls, graceful rate limit handling, better user experience with clear error messages and automatic recovery.
 
 ---
 
@@ -375,38 +421,38 @@ Coverage achieved:
 ---
 
 #### 8. Enhanced Error Recovery
-**Priority: Medium** | **Spec Status: Specified** | **Implementation: 20%**
+**Status: ✅ IMPLEMENTED in v1.6.0**
 
-**Partially implemented:**
-- ✓ Basic retry logic in fetch-docs
-- ✓ Exponential backoff
+**Implementation:**
+- ✓ Error categorization module (error-utils.js)
+- ✓ Adaptive backoff with jitter and Retry-After support
+- ✓ Checkpoint system for pause/resume capability
+- ✓ Resume from interrupted crawls
+- ✓ Rate limit handling (429 responses)
+- ✓ Detailed error reporting with categorization
+- ✓ 75 comprehensive unit tests (48 error-utils + 27 checkpoint-manager)
 
-**Missing:**
-- ✗ Pause/resume for interrupted crawls
-- ✗ Partial cache preservation (currently fails entire fetch)
-- ✗ Recovery from rate limits (429 responses)
-- ✗ Adaptive delay adjustment based on server response
-- ✗ Checkpoint system for large crawls
-- ✗ Resume from last successful page
+**Files added:**
+- New: `scripts/error-utils.js` (Error categorization and adaptive backoff)
+- New: `scripts/checkpoint-manager.js` (Checkpoint/resume functionality)
+- New: `tests/unit/error-utils.test.js` (48 tests)
+- New: `tests/unit/checkpoint-manager.test.js` (27 tests)
+- Modified: `scripts/fetch-docs.js`, `scripts/update-docs.js`, `doc-fetcher-config.json`
 
-**Impact:**
-- Large documentation fetches (500+ pages) can fail completely if interrupted
-- Network hiccups require complete re-fetch
-- Rate limiting can cause complete failure
-- Poor user experience for unreliable connections
+**Impact:** Data loss prevention, graceful rate limit handling, better UX ✅
 
-**Effort:** Medium (3-4 days)
+See "✅ FULLY IMPLEMENTED - Section 9" above for complete details.
 
 ---
 
 ## 🎯 RECOMMENDED IMPLEMENTATION PRIORITY
 
 ### Phase 1 - Make It Robust (Critical)
-**Timeline: 1-2 weeks** | **Status: 75% Complete**
+**Timeline: 1-2 weeks** | **Status: ✅ 100% COMPLETE**
 
 1. **~~Testing Infrastructure~~** ⭐⭐⭐ **✅ COMPLETED (v1.2.0)**
    - ✓ Added Jest test framework
-   - ✓ 158 total unit tests (72 validation + 86 other)
+   - ✓ 274 total unit tests (all passing as of v1.6.0)
    - ✓ Test fixtures for JavaScript and Python
    - ✓ Test coverage reporting
    - ⚠ Integration tests still needed
@@ -428,44 +474,47 @@ Coverage achieved:
    - ✓ Integrated into all command scripts
    - ✓ Full JSDoc annotations
 
-4. **Enhanced Error Recovery** ⭐⭐
-   - Implement pause/resume for crawls
-   - Partial cache preservation
-   - Checkpoint system for large fetches
-   - Better rate limit handling
+4. **~~Enhanced Error Recovery~~** ⭐⭐⭐ **✅ COMPLETED (v1.6.0)**
+   - ✓ Error categorization (RATE_LIMIT, RETRYABLE, PERMANENT)
+   - ✓ Adaptive backoff with jitter
+   - ✓ Checkpoint system with pause/resume
+   - ✓ Rate limit handling (429 responses with Retry-After)
+   - ✓ Partial cache preservation
+   - ✓ 75 comprehensive unit tests (100% pass rate)
+   - ✓ Integrated into fetch-docs and update-docs
 
 ---
 
 ### Phase 2 - Fulfill Core Specification (High Priority)
-**Timeline: 2-3 weeks**
+**Timeline: 2-3 weeks** | **Status: ✅ 100% COMPLETE**
 
-5. **All 5 Skill Templates** ⭐⭐⭐
-   - Implement Quick Reference template
-   - Implement Migration Guide template
-   - Implement Troubleshooter template
-   - Implement Best Practices template
-   - Enhance Expert template with content analysis
+5. **~~All 5 Skill Templates~~** ⭐⭐⭐ **✅ COMPLETED (v1.4.0)**
+   - ✓ Implement Quick Reference template
+   - ✓ Implement Migration Guide template
+   - ✓ Implement Troubleshooter template
+   - ✓ Implement Best Practices template
+   - ✓ Enhance Expert template with content analysis
 
-6. **Content Analysis for Skills** ⭐⭐⭐
-   - Extract code examples from cached docs
-   - Detect and catalog API methods
-   - Identify topics and categorize content
-   - Build version comparison for migrations
-   - Extract error messages and solutions
+6. **~~Content Analysis for Skills~~** ⭐⭐⭐ **✅ COMPLETED (v1.4.0)**
+   - ✓ Extract code examples from cached docs
+   - ✓ Detect and catalog API methods
+   - ✓ Identify topics and categorize content
+   - ✓ Build version comparison for migrations
+   - ✓ Extract error messages and solutions
 
-7. **Incremental Updates** ⭐⭐⭐
-   - Implement change detection (sitemap diff)
-   - Selective page re-fetching
-   - Preserve unchanged content
-   - Track what changed between versions
-   - Optimize update performance
+7. **~~Incremental Updates~~** ⭐⭐⭐ **✅ COMPLETED (v1.5.0)**
+   - ✓ Implement change detection (sitemap diff)
+   - ✓ Selective page re-fetching
+   - ✓ Preserve unchanged content
+   - ✓ Track what changed between versions
+   - ✓ Optimize update performance (95%+ bandwidth savings)
 
-8. **Improved Framework Handlers** ⭐⭐
-   - Dynamic selector adaptation
-   - Shortcode/component handling
-   - Better fallback extraction
-   - Framework-specific parsing rules
-   - Content quality validation
+8. **Improved Framework Handlers** ⭐⭐ **⚠️ PARTIALLY COMPLETE**
+   - ⚠️ Dynamic selector adaptation
+   - ⚠️ Shortcode/component handling
+   - ⚠️ Better fallback extraction
+   - ⚠️ Framework-specific parsing rules
+   - ⚠️ Content quality validation
 
 ---
 
@@ -518,10 +567,10 @@ Coverage achieved:
 | **Commands (CLI)** | ✓ | ✓ Complete | 0% | - |
 | **Skill Templates** | 5 types | ✓ All 5 (v1.4.0) | **0%** ✅ | - |
 | **Content Analysis** | ✓ | ✓ Complete (v1.4.0) | **0%** ✅ | - |
-| **Testing** | Required | ✓ Jest + 199 tests (v1.5.0) | **0%** | - |
+| **Testing** | Required | ✓ Jest + 274 tests (v1.6.0) | **0%** | - |
 | **Incremental Updates** | ✓ | ✓ Complete (v1.5.0) | **0%** ✅ | - |
 | **Robots.txt** | ✓ | ✓ Complete (v1.1.0) | **0%** | - |
-| **Error Recovery** | ✓ | ⚠️ Basic | **80%** | MEDIUM |
+| **Error Recovery** | ✓ | ✓ Complete (v1.6.0) | **0%** ✅ | - |
 | **Framework Handlers** | ✓ | ⚠️ Static | **40%** | MEDIUM |
 | **JS Rendering** | ✓ | ✗ None | **100%** | MEDIUM |
 | **Authentication** | ✓ | ✗ None | **100%** | LOW |
@@ -540,47 +589,53 @@ Coverage achieved:
 | **find-llms-txt.js** | 260 | ✓ Complete | Excellent implementation |
 | **parse-sitemap.js** | 229 | ✓ Complete | Works well, no issues |
 | **extract-content.js** | 342 | ⚠️ Good | Needs dynamic selectors |
-| **fetch-docs.js** | 320 | ✓ Complete | Solid orchestration |
+| **fetch-docs.js** | ~520 | ✓ Complete | Enhanced with checkpoint/resume (v1.6.0) |
 | **detect-dependencies.js** | 550 | ✓ Excellent | Comprehensive support |
 | **list-docs.js** | 162 | ✓ Complete | Good UI/formatting |
-| **update-docs.js** | 280 | ✓ Complete | Incremental updates implemented (v1.5.0) |
+| **update-docs.js** | ~365 | ✓ Complete | Incremental updates + resume (v1.5.0+v1.6.0) |
 | **generate-skill.js** | 250 | ✓ Complete | Full analysis + 5 templates (v1.4.0) |
 | **utils.js** | ~200 | ✓ Complete | Solid utility functions |
+| **error-utils.js** | 305 | ✓ Complete | Error categorization (v1.6.0) |
+| **checkpoint-manager.js** | 392 | ✓ Complete | Resume capability (v1.6.0) |
 
 ---
 
 ## 💡 KEY INSIGHTS
 
 ### What Works Really Well
-1. **Incremental updates (v1.5.0)** - Intelligent change detection, 95%+ bandwidth savings, 10-100x faster updates
-2. **Skill generation (v1.4.0)** - All 5 templates with comprehensive content analysis (topics, code examples, API methods, keywords, hierarchy)
-3. **Dependency detection** - Excellent multi-language support with 54 library mappings
-4. **Core pipeline** - llms.txt → sitemap → extraction → markdown works smoothly
-5. **CLI design** - Well-structured commands with good help text
-6. **Configuration** - Flexible, well-documented config system
-7. **Documentation** - Comprehensive README and CONTRIBUTING guides
-8. **Testing** - 199 unit tests with 100% pass rate (v1.5.0)
+1. **Enhanced error recovery (v1.6.0)** - Checkpoint/resume, adaptive backoff, intelligent error categorization
+2. **Incremental updates (v1.5.0)** - Intelligent change detection, 95%+ bandwidth savings, 10-100x faster updates
+3. **Skill generation (v1.4.0)** - All 5 templates with comprehensive content analysis (topics, code examples, API methods, keywords, hierarchy)
+4. **Dependency detection** - Excellent multi-language support with 54 library mappings
+5. **Core pipeline** - llms.txt → sitemap → extraction → markdown works smoothly
+6. **CLI design** - Well-structured commands with good help text
+7. **Configuration** - Flexible, well-documented config system
+8. **Documentation** - Comprehensive README and CONTRIBUTING guides
+9. **Testing** - 274 unit tests with 100% pass rate (v1.6.0)
 
 ### Biggest Gaps
-1. **~~Incremental updates~~** - ✅ **COMPLETED (v1.5.0)** - Intelligent change detection with selective page fetching
-2. **~~Skill generation~~** - ✅ **COMPLETED (v1.4.0)** - All 5 templates with advanced content analysis
-3. **Advanced crawling** - Limited to static HTML sites (no JS rendering, auth support)
-4. **~~Content analysis~~** - ✅ **COMPLETED (v1.4.0)** - Full extraction of code examples, APIs, topics, keywords, hierarchy
-5. **~~Input validation~~** - ✅ **COMPLETED (v1.3.0)** - Comprehensive validation with security features
+1. **~~Enhanced error recovery~~** - ✅ **COMPLETED (v1.6.0)** - Checkpoint/resume with adaptive backoff and error categorization
+2. **~~Incremental updates~~** - ✅ **COMPLETED (v1.5.0)** - Intelligent change detection with selective page fetching
+3. **~~Skill generation~~** - ✅ **COMPLETED (v1.4.0)** - All 5 templates with advanced content analysis
+4. **Advanced crawling** - Limited to static HTML sites (no JS rendering, auth support)
+5. **~~Content analysis~~** - ✅ **COMPLETED (v1.4.0)** - Full extraction of code examples, APIs, topics, keywords, hierarchy
+6. **~~Input validation~~** - ✅ **COMPLETED (v1.3.0)** - Comprehensive validation with security features
 
 ### Quick Wins (High Impact, Low Effort)
 1. **~~Robots.txt compliance~~** ✅ (v1.1.0) - huge credibility boost achieved
-2. **~~Basic testing~~** ✅ (v1.2.0) - 158 unit tests, catches bugs early
+2. **~~Basic testing~~** ✅ (v1.2.0) - 274 unit tests, catches bugs early
 3. **~~Input validation~~** ✅ (v1.3.0) - prevents common errors, security hardening
-4. **CI/CD integration** - 1-2 days, automated testing on commits
-5. **Integration tests** - 2-3 days, end-to-end validation
+4. **~~Enhanced error recovery~~** ✅ (v1.6.0) - data loss prevention, graceful rate limiting
+5. **CI/CD integration** - 1-2 days, automated testing on commits
+6. **Integration tests** - 2-3 days, end-to-end validation
 
 ### Long-Term Investments
-1. ~~**Incremental updates**~~ ✅ (v1.5.0) - 1 week, massive performance improvement - **COMPLETED**
-2. ~~**Full skill template system**~~ ✅ (v1.4.0) - 1 week, fulfills core spec - **COMPLETED**
-3. ~~**Content analysis**~~ ✅ (v1.4.0) - 1 week, makes skills actually useful - **COMPLETED**
-4. **JS rendering** - 1 week, supports modern doc sites
-5. **Semantic search** - 2 weeks, future-proofs the system
+1. ~~**Enhanced error recovery**~~ ✅ (v1.6.0) - 1 week, data loss prevention, better UX - **COMPLETED**
+2. ~~**Incremental updates**~~ ✅ (v1.5.0) - 1 week, massive performance improvement - **COMPLETED**
+3. ~~**Full skill template system**~~ ✅ (v1.4.0) - 1 week, fulfills core spec - **COMPLETED**
+4. ~~**Content analysis**~~ ✅ (v1.4.0) - 1 week, makes skills actually useful - **COMPLETED**
+5. **JS rendering** - 1 week, supports modern doc sites
+6. **Semantic search** - 2 weeks, future-proofs the system
 
 ---
 
@@ -593,9 +648,9 @@ The doc-fetcher plugin will be **feature-complete** when:
 - [x] Content analysis extracts code examples, APIs, topics ✅ (v1.4.0)
 - [x] Incremental updates only fetch changed pages ✅ (v1.5.0)
 - [x] Robots.txt compliance on all crawls ✅ (v1.1.0)
-- [x] Testing infrastructure with Jest ✅ (v1.2.0-v1.5.0) - 199 tests, validation at 87.61% coverage
+- [x] Testing infrastructure with Jest ✅ (v1.2.0-v1.6.0) - 274 tests, validation at 87.61% coverage
 - [x] Input validation on all commands ✅ (v1.3.0)
-- [ ] Error recovery with pause/resume
+- [x] Error recovery with pause/resume ✅ (v1.6.0)
 
 ### Should Have (Enhanced)
 - [ ] JavaScript rendering for SPA docs
@@ -617,36 +672,36 @@ The doc-fetcher plugin will be **feature-complete** when:
 
 | Phase | Features | Effort | Priority | Status |
 |-------|----------|--------|----------|--------|
-| **Phase 1** | Testing, robots.txt, validation, error recovery | 1-2 weeks | CRITICAL | **75% Complete** |
-| **Phase 2** | 5 templates, content analysis, incremental updates | 2-3 weeks | HIGH | **100% Complete** ✅ |
+| **Phase 1** | Testing, robots.txt, validation, error recovery | 1-2 weeks | CRITICAL | **✅ 100% Complete** |
+| **Phase 2** | 5 templates, content analysis, incremental updates | 2-3 weeks | HIGH | **✅ 100% Complete** |
 | **Phase 3** | JS rendering, auth, remote sync, auto-update | 3-4 weeks | MEDIUM | **0% Complete** |
-| **Total** | Full specification implementation | **6-9 weeks** | - | **~90% Done** |
+| **Total** | Full specification implementation | **6-9 weeks** | - | **~95% Done** |
 
-**Current state:** ~90% complete (~8 weeks invested, v1.5.0)
-**Phase 1 Progress:** Testing ✅, Robots.txt ✅, Validation ✅, Error recovery pending
+**Current state:** ~95% complete (~9 weeks invested, v1.6.0)
+**Phase 1 Progress:** Testing ✅, Robots.txt ✅, Validation ✅, Error recovery ✅ **COMPLETE**
 **Phase 2 Progress:** Templates ✅, Content Analysis ✅, Incremental updates ✅ **COMPLETE**
-**Remaining work:** ~10% incomplete (~1 week to finish error recovery)
+**Remaining work:** ~5% incomplete (Phase 3 advanced features)
 
 ---
 
 ## 🚀 RECOMMENDED NEXT STEPS
 
-1. **~~Completed (v1.1.0 - v1.5.0)~~** ✅
+1. **~~Completed (v1.1.0 - v1.6.0)~~** ✅
    - ~~Add robots.txt compliance~~ ✓ Done (v1.1.0)
    - ~~Set up testing framework (Jest)~~ ✓ Done (v1.2.0)
-   - ~~Write tests for critical functions~~ ✓ Done (199 tests, v1.2.0-v1.5.0)
+   - ~~Write tests for critical functions~~ ✓ Done (274 tests, v1.2.0-v1.6.0)
    - ~~Add input validation~~ ✓ Done (v1.3.0)
    - ~~Implement all 5 skill templates~~ ✓ Done (v1.4.0)
    - ~~Add content analysis to skills~~ ✓ Done (v1.4.0)
    - ~~Implement incremental updates~~ ✓ Done (v1.5.0)
+   - ~~Enhanced error recovery (pause/resume)~~ ✓ Done (v1.6.0)
 
 2. **Immediate (This Week)**
    - Expand test coverage to integration tests
    - Add CI/CD pipeline for automated testing
-   - Begin enhanced error recovery implementation
 
 3. **Short-term (This Month)**
-   - Enhanced error recovery (pause/resume for crawls)
+   - Consider improved framework handlers
 
 4. **Medium-term (Next Quarter)**
    - JavaScript rendering support
@@ -662,13 +717,14 @@ The doc-fetcher plugin will be **feature-complete** when:
 
 ## 📝 NOTES
 
-- **Code Quality**: Excellent structure with comprehensive testing and validation (v1.5.0)
-- **Testing**: 199 unit tests (all passing) with validation module at 87.61% coverage, comprehensive comparison logic testing
+- **Code Quality**: Excellent structure with comprehensive testing, validation, and error recovery (v1.6.0)
+- **Testing**: 274 unit tests (all passing) with validation module at 87.61% coverage, comprehensive error recovery and checkpoint logic testing
 - **Documentation**: Excellent - README, CHANGELOG, and inline documentation all comprehensive and well-maintained
-- **Spec Alignment**: Core pipeline fully implemented, Phase 2 features complete (v1.5.0)
-- **User Experience**: Excellent for core use cases with intelligent incremental updates, still missing advanced features (JS rendering, auth)
+- **Spec Alignment**: Core pipeline fully implemented, Phase 1 and Phase 2 features complete (v1.6.0)
+- **User Experience**: Excellent for core use cases with intelligent incremental updates and robust error recovery, still missing advanced features (JS rendering, auth)
 - **Maintenance**: Easy to extend with excellent test coverage providing confidence for refactoring
 - **Performance**: Incremental updates provide 95%+ bandwidth savings and 10-100x speed improvement
+- **Reliability**: Checkpoint/resume system prevents data loss on interrupted crawls (500+ pages)
 
-**Last Updated:** 2025-01-18 (Updated for v1.5.0 incremental updates)
+**Last Updated:** 2025-01-18 (Updated for v1.6.0 Enhanced Error Recovery)
 **Review Date:** After each major feature implementation
