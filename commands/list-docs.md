@@ -1,17 +1,16 @@
 ---
 description: List all cached documentation with versions, sizes, and metadata
-allowed-tools: Bash(npm run list:*)
+allowed-tools: Bash(node:*)
 argument-hint: [--project] [--verbose]
 ---
 
 # List Documentation
 
-Display all cached documentation from the project's `.claude/docs` directory including versions, sizes, update times, and associated skills.
+Display all cached documentation from the current project's `.claude/docs` directory including versions, sizes, update times, and associated skills.
 
 ## Current Context
 
 - Current working directory: !`pwd`
-- Cache directory location: !`cat doc-fetcher-config.json | grep cache_directory`
 
 ## Your Task
 
@@ -23,8 +22,9 @@ When the user invokes this command, follow these steps:
    - If no arguments: show default view (all cached docs)
 
 2. **Run List Command**:
-   - Execute: `npm run list -- $ARGUMENTS`
-   - The script will scan the **`.claude/docs` directory** (in the project) and display:
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/list-docs.js $ARGUMENTS --path "$(pwd)"`
+   - The `--path` argument tells the script to operate on the **current project directory**
+   - The script will scan the project's **`.claude/docs` directory** and display:
      - Library names and versions
      - Number of pages cached
      - Storage sizes
@@ -50,10 +50,13 @@ When the user invokes this command, follow these steps:
    - If cache directory doesn't exist: Inform user no docs are cached yet, suggest fetching docs
    - If cache directory is empty: Suggest using `/fetch-docs` to start caching documentation
    - If package.json not found (when using `--project`): Inform user and fall back to showing all cached docs
+   - If script not found: Verify the doc-fetcher plugin is installed
 
 ## Important Notes
 
+- The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
+- The `--path` parameter tells it which project to operate on (current directory)
 - The list command is fast (reads index files only, doesn't scan page content)
-- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in project directory)
+- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in the project)
 - Use `--project` to see which of your project's dependencies have cached documentation
 - Use `--verbose` for complete details including source URLs and local paths

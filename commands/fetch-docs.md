@@ -1,16 +1,15 @@
 ---
 description: Fetch and cache documentation for a library with version-specific snapshots
-allowed-tools: Bash(npm run fetch:*), Bash(npm run list:*)
+allowed-tools: Bash(node:*)
 argument-hint: <library> [version] [--url <custom-url>]
 ---
 
 # Fetch Documentation
 
-Fetch and cache documentation for a specified library, creating a local snapshot in the project's `.claude/docs` directory for accurate, version-specific AI context.
+Fetch and cache documentation for a specified library, creating a local snapshot in the current project's `.claude/docs` directory for accurate, version-specific AI context.
 
 ## Current Context
 
-- Currently cached docs: !`npm run list`
 - Current working directory: !`pwd`
 
 ## Your Task
@@ -24,11 +23,12 @@ When the user invokes this command, follow these steps:
    - If library is missing: prompt for the library name
 
 2. **Run Fetch Command**:
-   - Execute: `npm run fetch -- $ARGUMENTS`
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/fetch-docs.js $ARGUMENTS --path "$(pwd)"`
+   - The `--path` argument tells the script to operate on the **current project directory**
    - The script will:
      - Discover documentation format (llms.txt, claude.txt, or sitemap.xml)
      - Detect the documentation framework (Docusaurus, VitePress, Nextra, etc.)
-     - Crawl and cache pages to **`.claude/docs/[library]/[version]/`** (in project directory)
+     - Crawl and cache pages to **`.claude/docs/[library]/[version]/`** in the current project
      - Respect robots.txt and rate limits
      - Save metadata in `index.json` and structure in `sitemap.json`
    - Monitor progress and show status to the user
@@ -36,7 +36,7 @@ When the user invokes this command, follow these steps:
 3. **Handle Results**:
    - If successful: Report:
      - Number of pages fetched
-     - Storage location (`.claude/docs/[library]/[version]/`)
+     - Storage location (`.claude/docs/[library]/[version]/` in current project)
      - Total size
      - Whether a skill was auto-generated
    - Show next steps (how to use the cached docs or generate a skill)
@@ -47,12 +47,15 @@ When the user invokes this command, follow these steps:
    - If rate limited: Suggest increasing `crawl_delay_ms` in `doc-fetcher-config.json`
    - If documentation too large (>500 pages): Inform user and ask if they want to continue
    - If framework not detected: Suggest using `--url` with the docs homepage
+   - If script not found: Verify the doc-fetcher plugin is installed
 
 5. **Skill Generation**: If `auto_generate_skills: true` in config, inform the user that a skill was automatically created and how to use it.
 
 ## Important Notes
 
-- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in the project directory)
+- The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
+- The `--path` parameter tells it which project to operate on (current directory)
+- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in the project)
 - Fetching can take several minutes for large documentation sets
 - Use specific versions (e.g., `/fetch-docs nextjs 15.0.0`) to match your project's package.json
 - The fetched docs are stored locally and won't be updated automatically (use `/update-docs` for that)
