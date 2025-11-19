@@ -136,7 +136,7 @@ export async function extractTopics(docsPath) {
   }
 
   const files = await fs.readdir(pagesPath);
-  const markdownFiles = files.filter(f => f.endsWith('.md'));
+  const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.txt'));
 
   if (markdownFiles.length === 0) {
     return {

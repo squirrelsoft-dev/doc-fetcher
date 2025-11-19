@@ -161,7 +161,7 @@ export async function extractKeywords(docsPath, topN = 50) {
   }
 
   const files = await fs.readdir(pagesPath);
-  const markdownFiles = files.filter(f => f.endsWith('.md'));
+  const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.txt'));
 
   if (markdownFiles.length === 0) {
     return {

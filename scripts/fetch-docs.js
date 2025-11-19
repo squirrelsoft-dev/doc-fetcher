@@ -448,13 +448,13 @@ async function fetchDocumentation(library, version, options) {
     log(`✓ Found ${aiDocsResult.type} (${formatBytes(aiDocsResult.size)})`, 'info');
     log('Using AI-optimized format instead of crawling', 'info');
 
-    // Save llms.txt content directly
+    // Save llms.txt content with original filename
     sourceType = 'llms.txt';
     sourceUrl = aiDocsResult.url;
     pages = [{
       url: aiDocsResult.url,
       title: `${library} Documentation`,
-      filename: 'index.md',
+      filename: aiDocsResult.type,  // Preserve original filename (llms.txt, llms-full.txt, claude.txt, etc.)
       size: aiDocsResult.size,
       content: aiDocsResult.content
     }];
@@ -513,7 +513,7 @@ async function fetchDocumentation(library, version, options) {
 
   // Save llms.txt content if that's what we used
   if (sourceType === 'llms.txt' && pages.length > 0) {
-    const pagePath = path.join(libraryPath, 'pages', 'index.md');
+    const pagePath = path.join(libraryPath, 'pages', pages[0].filename);
     await fs.writeFile(pagePath, pages[0].content, 'utf-8');
   }
 
