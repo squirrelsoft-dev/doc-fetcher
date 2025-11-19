@@ -5,6 +5,7 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
 import pLimit from 'p-limit';
+import { RobotsChecker } from './robots-checker.js';
 import findAIOptimizedDocs from './find-llms-txt.js';
 import parseSitemap from './parse-sitemap.js';
 import extractContent from './extract-content.js';
@@ -90,10 +91,11 @@ ${markdown}`;
 /**
  * Crawl documentation pages
  */
-async function crawlPages(urls, libraryPath, config) {
+async function crawlPages(urls, libraryPath, config, robotsChecker) {
   const results = {
     successful: 0,
     failed: 0,
+    skipped: 0,
     totalSize: 0,
     pages: []
   };
@@ -109,10 +111,20 @@ async function crawlPages(urls, libraryPath, config) {
 
   const progress = new ProgressBar(urlsToCrawl.length);
 
+  // Get crawl delay from robots.txt or use config default
+  const crawlDelay = robotsChecker?.getCrawlDelay() || config.crawl_delay_ms;
+
   const tasks = urlsToCrawl.map((url, index) =>
     limit(async () => {
+      // Check robots.txt
+      if (robotsChecker && !robotsChecker.isAllowed(url)) {
+        results.skipped++;
+        progress.increment();
+        return null;
+      }
+
       // Rate limiting
-      await sleep(config.crawl_delay_ms);
+      await sleep(crawlDelay);
 
       // Fetch HTML
       const fetchResult = await fetchHtml(url, config);
@@ -180,9 +192,20 @@ async function fetchDocumentation(library, version, options) {
   const docUrl = options.url || `https://${library}.dev/docs`;
   log(`Documentation URL: ${docUrl}`, 'info');
 
+  // 0. Initialize robots.txt checker
+  log('\\n[1/7] Checking robots.txt...', 'info');
+  const robotsChecker = new RobotsChecker(docUrl, config);
+  await robotsChecker.init();
+
+  // Check for sitemaps in robots.txt
+  const robotsSitemaps = robotsChecker.getSitemaps();
+  if (robotsSitemaps.length > 0) {
+    log(`Found ${robotsSitemaps.length} sitemap(s) in robots.txt`, 'debug');
+  }
+
   // 1. Check for AI-optimized docs (llms.txt)
-  log('\\n[1/6] Checking for AI-optimized documentation...', 'info');
-  const aiDocsResult = await findAIOptimizedDocs(docUrl, config);
+  log('\\n[2/7] Checking for AI-optimized documentation...', 'info');
+  const aiDocsResult = await findAIOptimizedDocs(docUrl, config, robotsChecker);
 
   let pages = [];
   let sourceType = null;
@@ -204,9 +227,9 @@ async function fetchDocumentation(library, version, options) {
     }];
   } else {
     // 2. Parse sitemap.xml
-    log('\\n[2/6] Parsing sitemap.xml...', 'info');
+    log('\\n[3/7] Parsing sitemap.xml...', 'info');
     try {
-      const sitemapResult = await parseSitemap(docUrl, config);
+      const sitemapResult = await parseSitemap(docUrl, config, robotsChecker, robotsSitemaps);
       sourceType = 'sitemap';
       sourceUrl = sitemapResult.sitemapUrl;
       const urls = sitemapResult.docUrls;
@@ -214,12 +237,15 @@ async function fetchDocumentation(library, version, options) {
       log(`Found ${urls.length} documentation pages`, 'info');
 
       // 3. Crawl pages
-      log('\\n[3/6] Crawling documentation pages...', 'info');
-      const crawlResults = await crawlPages(urls, path.join(cacheDir, library, version || 'latest'), config);
+      log('\\n[4/7] Crawling documentation pages...', 'info');
+      const crawlResults = await crawlPages(urls, path.join(cacheDir, library, version || 'latest'), config, robotsChecker);
 
       pages = crawlResults.pages;
 
       log(`\\n✓ Crawled ${crawlResults.successful} pages`, 'info');
+      if (crawlResults.skipped > 0) {
+        log(`⚠ Skipped ${crawlResults.skipped} pages (disallowed by robots.txt)`, 'warn');
+      }
       if (crawlResults.failed > 0) {
         log(`✗ Failed to crawl ${crawlResults.failed} pages`, 'warn');
       }
@@ -230,7 +256,7 @@ async function fetchDocumentation(library, version, options) {
   }
 
   // 4. Create cache directory structure
-  log('\\n[4/6] Saving to cache...', 'info');
+  log('\\n[5/7] Saving to cache...', 'info');
   const libraryPath = getLibraryPath(cacheDir, library, version || 'latest');
   await ensureDir(libraryPath);
   await ensureDir(path.join(libraryPath, 'pages'));
@@ -242,7 +268,7 @@ async function fetchDocumentation(library, version, options) {
   }
 
   // 5. Save metadata
-  log('[5/6] Saving metadata...', 'info');
+  log('[6/7] Saving metadata...', 'info');
   const totalSize = await getDirSize(libraryPath);
   const metadata = {
     library,
@@ -272,7 +298,7 @@ async function fetchDocumentation(library, version, options) {
   await saveSitemap(libraryPath, sitemapStructure);
 
   // 6. Summary
-  log('\\n[6/6] Summary', 'info');
+  log('\\n[7/7] Summary', 'info');
   log(`✓ Documentation cached successfully!\\n`, 'info');
   log(`  Location: ${libraryPath}`, 'info');
   log(`  Pages: ${pages.length}`, 'info');

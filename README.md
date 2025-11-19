@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -20,11 +20,26 @@ AI coding agents frequently struggle with:
 
 - **AI-First**: Checks for `llms.txt` and `claude.txt` before web crawling
 - **Smart Crawling**: Auto-detects documentation frameworks (Docusaurus, VitePress, Nextra, GitBook, etc.)
+- **Robots.txt Compliance**: Respects webmaster preferences, honors crawl delays, prevents IP bans
 - **Version Management**: Cache multiple versions, pin to project dependencies
 - **Auto-Generated Skills**: Automatically creates Claude Code skills from cached docs
 - **Project Integration**: Detects dependencies from `package.json` and suggests fetching relevant docs
 - **Incremental Updates**: Only re-fetch changed pages when updating
 - **Offline-Ready**: Documentation works without internet once cached
+
+## Recent Updates
+
+### v1.1.0 (2025-01-18)
+
+#### Added
+- **Robots.txt Compliance** - Ethical crawling that respects webmaster preferences
+  - Automatically checks robots.txt before crawling any documentation site
+  - Respects `Disallow` directives (skips blocked URLs)
+  - Honors `Crawl-delay` for dynamic rate limiting
+  - Discovers sitemap URLs from robots.txt
+  - Caches robots.txt with 24-hour TTL for performance
+  - Three compliance modes: `true` (skip blocked, default), `false` (disabled), `strict` (error on violation)
+  - Graceful degradation when robots.txt unavailable
 
 ## Installation
 

@@ -16,7 +16,12 @@ const AI_DOC_LOCATIONS = [
 /**
  * Check if a URL exists and is accessible
  */
-async function checkUrl(url, config) {
+async function checkUrl(url, config, robotsChecker) {
+  // Check robots.txt if available
+  if (robotsChecker && !robotsChecker.isAllowed(url)) {
+    return { exists: false, disallowed: true };
+  }
+
   try {
     const response = await axios.head(url, {
       timeout: config.timeout_ms,
@@ -40,7 +45,15 @@ async function checkUrl(url, config) {
 /**
  * Fetch content from URL
  */
-async function fetchContent(url, config) {
+async function fetchContent(url, config, robotsChecker) {
+  // Check robots.txt if available
+  if (robotsChecker && !robotsChecker.isAllowed(url)) {
+    return {
+      success: false,
+      error: 'URL disallowed by robots.txt'
+    };
+  }
+
   try {
     const response = await axios.get(url, {
       timeout: config.timeout_ms,
@@ -145,7 +158,7 @@ function extractVersion(content) {
 /**
  * Find AI-optimized documentation (llms.txt, claude.txt) for a base URL
  */
-export async function findAIOptimizedDocs(baseUrl, config) {
+export async function findAIOptimizedDocs(baseUrl, config, robotsChecker) {
   const normalizedBase = normalizeUrl(baseUrl);
   log(`Checking for AI-optimized documentation at ${normalizedBase}...`, 'debug');
 
@@ -167,13 +180,18 @@ export async function findAIOptimizedDocs(baseUrl, config) {
 
     log(`  Checking ${testUrl}...`, 'debug');
 
-    const check = await checkUrl(testUrl, config);
+    const check = await checkUrl(testUrl, config, robotsChecker);
+
+    if (check.disallowed) {
+      log(`  ⚠ Disallowed by robots.txt`, 'warn');
+      continue;
+    }
 
     if (check.exists) {
       log(`  ✓ Found at ${testUrl}`, 'info');
 
       // Fetch content
-      const fetchResult = await fetchContent(testUrl, config);
+      const fetchResult = await fetchContent(testUrl, config, robotsChecker);
 
       if (fetchResult.success) {
         // Validate content
@@ -227,7 +245,7 @@ export async function main() {
   const config = await loadConfig();
 
   // Find AI-optimized docs
-  const result = await findAIOptimizedDocs(baseUrl, config);
+  const result = await findAIOptimizedDocs(baseUrl, config, null);
 
   // Output result
   if (result.found) {

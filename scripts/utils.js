@@ -16,6 +16,13 @@ export function getCacheDir() {
 }
 
 /**
+ * Get the robots.txt cache directory
+ */
+export function getRobotsCacheDir() {
+  return path.join(getCacheDir(), '.robots-cache');
+}
+
+/**
  * Get the plugin root directory
  */
 export function getPluginDir() {
@@ -342,6 +349,7 @@ export class ProgressBar {
 
 export default {
   getCacheDir,
+  getRobotsCacheDir,
   getPluginDir,
   loadConfig,
   ensureDir,

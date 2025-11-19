@@ -15,7 +15,12 @@ const SITEMAP_LOCATIONS = [
 /**
  * Fetch and parse XML
  */
-async function fetchXml(url, config) {
+async function fetchXml(url, config, robotsChecker) {
+  // Check robots.txt if available
+  if (robotsChecker && !robotsChecker.isAllowed(url)) {
+    throw new Error(`Sitemap URL disallowed by robots.txt: ${url}`);
+  }
+
   try {
     const response = await axios.get(url, {
       timeout: config.timeout_ms,
@@ -98,7 +103,7 @@ function filterDocUrls(urls, baseUrl, docPattern = /\/(docs?|documentation|guide
 /**
  * Recursively fetch all sitemaps if sitemap index is found
  */
-async function fetchAllSitemaps(initialUrls, config) {
+async function fetchAllSitemaps(initialUrls, config, robotsChecker) {
   const allUrls = [];
   const sitemapsToFetch = [];
 
@@ -114,7 +119,7 @@ async function fetchAllSitemaps(initialUrls, config) {
   for (const sitemapUrl of sitemapsToFetch) {
     try {
       log(`  Fetching nested sitemap: ${sitemapUrl}`, 'debug');
-      const sitemapData = await fetchXml(sitemapUrl, config);
+      const sitemapData = await fetchXml(sitemapUrl, config, robotsChecker);
       const urls = extractUrls(sitemapData);
       allUrls.push(...urls);
     } catch (error) {
@@ -128,37 +133,57 @@ async function fetchAllSitemaps(initialUrls, config) {
 /**
  * Parse sitemap from a base URL
  */
-export async function parseSitemap(baseUrl, config, docPattern) {
+export async function parseSitemap(baseUrl, config, robotsChecker, robotsSitemaps, docPattern) {
   const normalizedBase = normalizeUrl(baseUrl);
   log(`Looking for sitemap at ${normalizedBase}...`, 'debug');
 
   let sitemapUrl = null;
   let sitemapData = null;
 
-  // Try common sitemap locations
-  for (const location of SITEMAP_LOCATIONS) {
-    const testUrl = normalizedBase + location;
-    log(`  Checking ${testUrl}...`, 'debug');
+  // Try sitemaps from robots.txt first
+  if (robotsSitemaps && robotsSitemaps.length > 0) {
+    log(`Trying ${robotsSitemaps.length} sitemap(s) from robots.txt...`, 'debug');
 
-    try {
-      sitemapData = await fetchXml(testUrl, config);
-      sitemapUrl = testUrl;
-      log(`  ✓ Found sitemap at ${testUrl}`, 'info');
-      break;
-    } catch (error) {
-      // Continue to next location
+    for (const robotsSitemapUrl of robotsSitemaps) {
+      try {
+        log(`  Checking ${robotsSitemapUrl}...`, 'debug');
+        sitemapData = await fetchXml(robotsSitemapUrl, config, robotsChecker);
+        sitemapUrl = robotsSitemapUrl;
+        log(`  ✓ Found sitemap at ${robotsSitemapUrl}`, 'info');
+        break;
+      } catch (error) {
+        log(`  ⚠ Failed to fetch sitemap from robots.txt: ${error.message}`, 'warn');
+        // Continue to next sitemap
+      }
+    }
+  }
+
+  // If robots.txt sitemaps didn't work, try common locations
+  if (!sitemapData) {
+    for (const location of SITEMAP_LOCATIONS) {
+      const testUrl = normalizedBase + location;
+      log(`  Checking ${testUrl}...`, 'debug');
+
+      try {
+        sitemapData = await fetchXml(testUrl, config, robotsChecker);
+        sitemapUrl = testUrl;
+        log(`  ✓ Found sitemap at ${testUrl}`, 'info');
+        break;
+      } catch (error) {
+        // Continue to next location
+      }
     }
   }
 
   if (!sitemapData) {
-    throw new Error('No sitemap.xml found at standard locations');
+    throw new Error('No sitemap.xml found at standard locations or in robots.txt');
   }
 
   // Extract URLs
   let urls = extractUrls(sitemapData);
 
   // Recursively fetch if sitemap index
-  urls = await fetchAllSitemaps(urls, config);
+  urls = await fetchAllSitemaps(urls, config, robotsChecker);
 
   // Filter to documentation URLs
   const docUrls = filterDocUrls(urls, baseUrl, docPattern);
@@ -195,7 +220,7 @@ export async function main() {
 
   try {
     // Parse sitemap
-    const result = await parseSitemap(baseUrl, config, docPattern);
+    const result = await parseSitemap(baseUrl, config, null, [], docPattern);
 
     console.log('\n✓ Sitemap parsed successfully!\n');
     console.log(`Sitemap URL: ${result.sitemapUrl}`);
