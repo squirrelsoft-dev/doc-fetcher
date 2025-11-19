@@ -165,7 +165,7 @@ async function parsePythonDeps(projectPath) {
     const content = await fs.readFile(requirementsPath, 'utf-8');
     const dependencies = [];
 
-    for (const line of content.split('\\n')) {
+    for (const line of content.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
 
@@ -205,14 +205,14 @@ async function parsePyprojectToml(projectPath) {
     const dependencies = [];
 
     // Simple TOML parsing for dependencies section
-    const depsMatch = content.match(/\\[tool\\.poetry\\.dependencies\\]([\\s\\S]*?)\\n\\[/);
+    const depsMatch = content.match(/\[tool\.poetry\.dependencies\]([\s\S]*?)\n\[/);
     if (depsMatch) {
       const depsSection = depsMatch[1];
-      const depLines = depsSection.match(/^([a-zA-Z0-9_-]+)\\s*=\\s*"([^"]+)"/gm);
+      const depLines = depsSection.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/gm);
 
       if (depLines) {
         for (const line of depLines) {
-          const match = line.match(/^([a-zA-Z0-9_-]+)\\s*=\\s*"([^"]+)"/);
+          const match = line.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/);
           if (match) {
             const [, name, versionSpec] = match;
             if (name === 'python') continue; // Skip python version
@@ -221,7 +221,7 @@ async function parsePyprojectToml(projectPath) {
               name,
               normalizedName: normalizeLibraryName(name),
               versionSpec,
-              version: versionSpec.replace(/^[\\^~]/, ''),
+              version: versionSpec.replace(/^[\^~]/, ''),
               type: 'dependencies',
               ecosystem: 'python'
             });
@@ -250,15 +250,15 @@ async function parseGoDeps(projectPath) {
     const dependencies = [];
 
     // Parse require blocks
-    const requireMatch = content.match(/require \\(([\\s\\S]*?)\\)/);
+    const requireMatch = content.match(/require \(([\s\S]*?)\)/);
     if (requireMatch) {
-      const requireLines = requireMatch[1].split('\\n');
+      const requireLines = requireMatch[1].split('\n');
 
       for (const line of requireLines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        const match = trimmed.match(/^([\\w./\\-]+)\\s+v?([0-9.]+)/);
+        const match = trimmed.match(/^([\w./-]+)\s+v?([0-9.]+)/);
         if (match) {
           const [, name, version] = match;
           dependencies.push({
@@ -274,10 +274,10 @@ async function parseGoDeps(projectPath) {
     }
 
     // Also parse single-line requires
-    const singleRequires = content.match(/^require\\s+([\\w./\\-]+)\\s+v?([0-9.]+)/gm);
+    const singleRequires = content.match(/^require\s+([\w./-]+)\s+v?([0-9.]+)/gm);
     if (singleRequires) {
       for (const line of singleRequires) {
-        const match = line.match(/^require\\s+([\\w./\\-]+)\\s+v?([0-9.]+)/);
+        const match = line.match(/^require\s+([\w./-]+)\s+v?([0-9.]+)/);
         if (match) {
           const [, name, version] = match;
           if (!dependencies.find(d => d.name === name)) {
@@ -314,21 +314,21 @@ async function parseRustDeps(projectPath) {
     const dependencies = [];
 
     // Parse dependencies section
-    const depsMatch = content.match(/\\[dependencies\\]([\\s\\S]*?)(?:\\n\\[|$)/);
+    const depsMatch = content.match(/\[dependencies\]([\s\S]*?)(?:\n\[|$)/);
     if (depsMatch) {
       const depsSection = depsMatch[1];
-      const depLines = depsSection.match(/^([a-zA-Z0-9_-]+)\\s*=\\s*"([^"]+)"/gm);
+      const depLines = depsSection.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/gm);
 
       if (depLines) {
         for (const line of depLines) {
-          const match = line.match(/^([a-zA-Z0-9_-]+)\\s*=\\s*"([^"]+)"/);
+          const match = line.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/);
           if (match) {
             const [, name, version] = match;
             dependencies.push({
               name,
               normalizedName: normalizeLibraryName(name),
               versionSpec: version,
-              version: version.replace(/^[\\^~]/, ''),
+              version: version.replace(/^[\^~]/, ''),
               type: 'dependencies',
               ecosystem: 'rust'
             });
@@ -474,22 +474,22 @@ program
   .argument('[project-path]', 'Path to project directory', process.cwd())
   .action(async (projectPath) => {
     try {
-      log(`\\nDetecting dependencies in ${projectPath}...\\n`, 'info');
+      log(`\nDetecting dependencies in ${projectPath}...\n`, 'info');
 
       const result = await detectDependencies(projectPath);
 
       if (!result.ecosystem) {
-        console.log('No supported dependency files found.\\n');
+        console.log('No supported dependency files found.\n');
         console.log('Supported files:');
         console.log('  - package.json (JavaScript/TypeScript)');
         console.log('  - requirements.txt or pyproject.toml (Python)');
         console.log('  - go.mod (Go)');
-        console.log('  - Cargo.toml (Rust)\\n');
+        console.log('  - Cargo.toml (Rust)\n');
         process.exit(1);
       }
 
       console.log(`Ecosystem: ${result.ecosystem}`);
-      console.log(`Dependencies found: ${result.dependencies.length}\\n`);
+      console.log(`Dependencies found: ${result.dependencies.length}\n`);
 
       const suggestions = getSuggestions(result);
 
@@ -523,7 +523,7 @@ program
       console.log('Summary:');
       console.log(`  Current: ${suggestions.current.length}`);
       console.log(`  Outdated: ${suggestions.toUpdate.length}`);
-      console.log(`  Missing: ${suggestions.toFetch.length}\\n`);
+      console.log(`  Missing: ${suggestions.toFetch.length}\n`);
 
       if (suggestions.toFetch.length > 0 || suggestions.toUpdate.length > 0) {
         console.log('Quick fix:');
@@ -538,7 +538,7 @@ program
 
       process.exit(0);
     } catch (error) {
-      log(`\\n✗ Error: ${error.message}\\n`, 'error');
+      log(`\n✗ Error: ${error.message}\n`, 'error');
       console.error(error.stack);
       process.exit(1);
     }
