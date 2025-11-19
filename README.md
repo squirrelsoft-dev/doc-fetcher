@@ -41,6 +41,15 @@ AI coding agents frequently struggle with:
   - Three compliance modes: `true` (skip blocked, default), `false` (disabled), `strict` (error on violation)
   - Graceful degradation when robots.txt unavailable
 
+#### Fixed
+- **Doc-Crawler Agent Behavior** - Fixed agent to use existing scripts instead of creating custom code
+  - Agent now runs `node scripts/fetch-docs.js` instead of generating custom `crawler.js` files
+  - Added `type: agent` to frontmatter (was missing, causing ambiguous behavior)
+  - Rewrote instructions from tutorial-style (617 lines) to operational directives (335 lines)
+  - Removed file creation permissions to prevent custom code generation
+  - Added clear prohibitions against writing crawling logic
+  - Agent now leverages all existing infrastructure including robots.txt compliance
+
 ## Installation
 
 ### Via Claude Code Marketplace
