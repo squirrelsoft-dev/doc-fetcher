@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
+import { verifyDependencies } from './check-dependencies.js';
 import {
   loadConfig,
   getCacheDir,
@@ -245,6 +246,9 @@ program
       process.exit(1);
     }
   });
+
+// Verify plugin dependencies are installed
+await verifyDependencies('generate-skill');
 
 program.parse();
 

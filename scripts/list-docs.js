@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { verifyDependencies } from './check-dependencies.js';
 import {
   loadConfig,
   getCacheDir,
@@ -170,6 +171,9 @@ program
       process.exit(1);
     }
   });
+
+// Verify plugin dependencies are installed
+await verifyDependencies('list-docs');
 
 program.parse();
 

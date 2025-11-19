@@ -9,6 +9,7 @@ import { RobotsChecker } from './robots-checker.js';
 import findAIOptimizedDocs from './find-llms-txt.js';
 import parseSitemap from './parse-sitemap.js';
 import extractContent from './extract-content.js';
+import { verifyDependencies } from './check-dependencies.js';
 import {
   loadConfig,
   getCacheDir,
@@ -713,6 +714,9 @@ program
       process.exit(1);
     }
   });
+
+// Verify plugin dependencies are installed
+await verifyDependencies('fetch-docs');
 
 program.parse();
 

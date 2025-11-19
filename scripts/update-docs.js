@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import path from 'path';
 import fetchDocumentation, { incrementalUpdate } from './fetch-docs.js';
 import generateSkill from './generate-skill.js';
+import { verifyDependencies } from './check-dependencies.js';
 import {
   loadConfig,
   getCacheDir,
@@ -371,6 +372,9 @@ program
       process.exit(1);
     }
   });
+
+// Verify plugin dependencies are installed
+await verifyDependencies('update-docs');
 
 program.parse();
 
