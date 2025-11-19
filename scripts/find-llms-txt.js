@@ -63,10 +63,20 @@ async function fetchContent(url, config, robotsChecker) {
       responseType: 'text'
     });
 
+    const contentType = response.headers['content-type'] || '';
+
+    // Check if Content-Type indicates HTML (likely a 404 page)
+    if (contentType.includes('text/html')) {
+      return {
+        success: false,
+        error: 'Server returned HTML instead of plain text (likely a 404 or error page)'
+      };
+    }
+
     return {
       success: true,
       content: response.data,
-      contentType: response.headers['content-type'],
+      contentType: contentType,
       size: response.data.length
     };
   } catch (error) {
@@ -81,6 +91,45 @@ async function fetchContent(url, config, robotsChecker) {
  * Validate AI-optimized documentation content
  */
 function validateContent(content) {
+  // Check for HTML content (llms.txt should be plain text/markdown, not HTML)
+  const htmlPatterns = [
+    /<!DOCTYPE\s+html/i,
+    /<html[\s>]/i,
+    /<head[\s>]/i,
+    /<body[\s>]/i,
+    /<meta[\s>]/i
+  ];
+
+  const isHTML = htmlPatterns.some(pattern => pattern.test(content));
+
+  if (isHTML) {
+    return {
+      valid: false,
+      reason: 'Content is HTML, not plain text documentation (likely a 404 or error page)'
+    };
+  }
+
+  // Check for common 404 page patterns
+  const notFoundPatterns = [
+    /404.*not found/i,
+    /page not found/i,
+    /not found.*404/i,
+    /the page you.*looking for.*doesn't exist/i,
+    /the page you.*looking for.*could not be found/i,
+    /this page could not be found/i,
+    /error 404/i,
+    /http.*404/i
+  ];
+
+  const is404Page = notFoundPatterns.some(pattern => pattern.test(content));
+
+  if (is404Page) {
+    return {
+      valid: false,
+      reason: 'Content appears to be a 404 error page'
+    };
+  }
+
   // Minimum content length (500 bytes)
   if (content.length < 500) {
     return {
