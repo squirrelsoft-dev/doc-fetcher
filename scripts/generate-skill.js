@@ -12,7 +12,8 @@ import {
   getPluginDir,
   ensureDir,
   log,
-  formatRelativeTime
+  formatRelativeTime,
+  listCachedLibraries
 } from './utils.js';
 import {
   validateLibraryName,
@@ -162,8 +163,22 @@ async function generateSkill(library, version, options) {
   const config = await loadConfig();
   const cacheDir = config.cache_directory || getCacheDir();
 
+  // Resolve version if not specified
+  let actualVersion = version;
+  if (!actualVersion) {
+    const libraries = await listCachedLibraries(cacheDir);
+    const cachedVersions = libraries.filter(lib => lib.name === library);
+
+    if (cachedVersions.length === 0) {
+      throw new Error(`No cached documentation found for ${library}. Run /fetch-docs ${library} first.`);
+    }
+
+    actualVersion = cachedVersions[0].version;
+    log(`Using cached version: ${actualVersion}`, 'info');
+  }
+
   // Load metadata
-  const libraryPath = getLibraryPath(cacheDir, library, version || 'latest');
+  const libraryPath = getLibraryPath(cacheDir, library, actualVersion);
   const metadata = await loadMetadata(libraryPath);
 
   if (!metadata) {
