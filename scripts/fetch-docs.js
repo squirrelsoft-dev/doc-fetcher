@@ -97,8 +97,17 @@ ${markdown}`;
 
 /**
  * Crawl documentation pages
+ * @param {Array<string|Object>} urlEntries - Array of URLs or URL entry objects with metadata
+ * @param {string} libraryPath - Path to save pages
+ * @param {Object} config - Configuration object
+ * @param {Object} robotsChecker - RobotsChecker instance
+ * @param {Object} [options] - Crawl options
+ * @param {Set<string>} [options.pageFilter] - Set of URLs to fetch (if provided, only these will be fetched)
+ * @returns {Promise<Object>} Crawl results
  */
-async function crawlPages(urls, libraryPath, config, robotsChecker) {
+async function crawlPages(urlEntries, libraryPath, config, robotsChecker, options = {}) {
+  const { pageFilter } = options;
+
   const results = {
     successful: 0,
     failed: 0,
@@ -109,20 +118,37 @@ async function crawlPages(urls, libraryPath, config, robotsChecker) {
 
   const limit = pLimit(5); // Limit concurrent requests
 
-  // Limit number of pages if configured
-  const urlsToCrawl = urls.slice(0, config.max_pages_per_fetch);
-
-  if (urls.length > config.max_pages_per_fetch) {
-    log(`⚠ Limiting to ${config.max_pages_per_fetch} pages (${urls.length} total found)`, 'warn');
+  // Apply page filter if provided
+  let entriesToProcess = urlEntries;
+  if (pageFilter && pageFilter.size > 0) {
+    entriesToProcess = urlEntries.filter(entry => {
+      const url = typeof entry === 'string' ? entry : entry.loc;
+      return pageFilter.has(url);
+    });
   }
 
-  const progress = new ProgressBar(urlsToCrawl.length);
+  // Limit number of pages if configured
+  const entriesToCrawl = entriesToProcess.slice(0, config.max_pages_per_fetch);
+
+  if (entriesToProcess.length > config.max_pages_per_fetch) {
+    log(`⚠ Limiting to ${config.max_pages_per_fetch} pages (${entriesToProcess.length} total found)`, 'warn');
+  }
+
+  const progress = new ProgressBar(entriesToCrawl.length);
 
   // Get crawl delay from robots.txt or use config default
   const crawlDelay = robotsChecker?.getCrawlDelay() || config.crawl_delay_ms;
 
-  const tasks = urlsToCrawl.map((url, index) =>
+  const tasks = entriesToCrawl.map((entry, index) =>
     limit(async () => {
+      // Extract URL and metadata from entry
+      const url = typeof entry === 'string' ? entry : entry.loc;
+      const urlMetadata = typeof entry === 'object' ? {
+        lastmod: entry.lastmod || null,
+        changefreq: entry.changefreq || null,
+        priority: entry.priority || null
+      } : {};
+
       // Check robots.txt
       if (robotsChecker && !robotsChecker.isAllowed(url)) {
         results.skipped++;
@@ -166,7 +192,8 @@ async function crawlPages(urls, libraryPath, config, robotsChecker) {
           url,
           title: extractResult.metadata.title,
           filename: pageInfo.filename,
-          size: pageInfo.size
+          size: pageInfo.size,
+          ...urlMetadata  // Include sitemap metadata (lastmod, changefreq, priority)
         });
 
         progress.increment();
@@ -254,13 +281,13 @@ async function fetchDocumentation(library, version, options) {
       const sitemapResult = await parseSitemap(docUrl, config, robotsChecker, robotsSitemaps);
       sourceType = 'sitemap';
       sourceUrl = sitemapResult.sitemapUrl;
-      const urls = sitemapResult.docUrls;
+      const urlEntries = sitemapResult.fullEntries; // Use fullEntries to preserve metadata
 
-      log(`Found ${urls.length} documentation pages`, 'info');
+      log(`Found ${urlEntries.length} documentation pages`, 'info');
 
       // 3. Crawl pages
       log('\\n[4/7] Crawling documentation pages...', 'info');
-      const crawlResults = await crawlPages(urls, path.join(cacheDir, library, version || 'latest'), config, robotsChecker);
+      const crawlResults = await crawlPages(urlEntries, path.join(cacheDir, library, version || 'latest'), config, robotsChecker);
 
       pages = crawlResults.pages;
 
@@ -314,7 +341,10 @@ async function fetchDocumentation(library, version, options) {
       url: p.url,
       title: p.title,
       filename: p.filename,
-      size: p.size
+      size: p.size,
+      lastmod: p.lastmod || null,
+      changefreq: p.changefreq || null,
+      priority: p.priority || null
     }))
   };
   await saveSitemap(libraryPath, sitemapStructure);
@@ -339,6 +369,127 @@ async function fetchDocumentation(library, version, options) {
     path: libraryPath,
     pages: pages.length,
     size: totalSize,
+    metadata
+  };
+}
+
+/**
+ * Perform incremental update - fetch only changed pages and merge with existing cache
+ * @param {string} library - Library name
+ * @param {string} version - Version
+ * @param {Array} urlEntries - Full URL entries from sitemap
+ * @param {Object} comparison - Comparison results from compare-sitemaps
+ * @param {string} libraryPath - Path to library cache
+ * @param {Object} config - Configuration
+ * @param {Object} robotsChecker - RobotsChecker instance
+ * @returns {Promise<Object>} Update results
+ */
+export async function incrementalUpdate(library, version, urlEntries, comparison, libraryPath, config, robotsChecker) {
+  const { modified, added, unchanged } = comparison;
+
+  // Build set of URLs that need fetching
+  const urlsToFetch = new Set([
+    ...modified.map(p => p.url),
+    ...added.map(p => p.url)
+  ]);
+
+  if (urlsToFetch.size === 0) {
+    log('\nNo changes detected - documentation is up to date', 'info');
+    return {
+      library,
+      version,
+      path: libraryPath,
+      pages: unchanged.length,
+      updated: false,
+      stats: {
+        unchanged: unchanged.length,
+        modified: 0,
+        added: 0
+      }
+    };
+  }
+
+  log(`\n[3/3] Fetching ${urlsToFetch.size} changed/new pages...`, 'info');
+
+  // Crawl only the changed/new pages
+  const crawlResults = await crawlPages(
+    urlEntries,
+    libraryPath,
+    config,
+    robotsChecker,
+    { pageFilter: urlsToFetch }
+  );
+
+  // Merge crawled pages with unchanged pages
+  const allPages = [
+    ...unchanged.map(p => ({
+      url: p.url,
+      title: p.title,
+      filename: p.filename,
+      size: p.size,
+      lastmod: p.lastmod,
+      changefreq: p.changefreq,
+      priority: p.priority
+    })),
+    ...crawlResults.pages
+  ];
+
+  // Update metadata
+  const totalSize = await getDirSize(libraryPath);
+  const metadata = {
+    library,
+    version: version || 'latest',
+    source_url: config.source_url || libraryPath,
+    fetched_at: new Date().toISOString(),
+    source_type: 'sitemap',
+    source_file_url: null,
+    page_count: allPages.length,
+    total_size_bytes: totalSize,
+    framework: 'unknown',
+    skill_generated: false,
+    skill_path: null,
+    last_update_stats: {
+      pages_checked: comparison.stats.total,
+      pages_unchanged: unchanged.length,
+      pages_modified: modified.length,
+      pages_added: added.length,
+      pages_removed: comparison.removed.length
+    }
+  };
+
+  await saveMetadata(libraryPath, metadata);
+
+  // Update sitemap structure
+  const sitemapStructure = {
+    pages: allPages.map(p => ({
+      url: p.url,
+      title: p.title,
+      filename: p.filename,
+      size: p.size,
+      lastmod: p.lastmod || null,
+      changefreq: p.changefreq || null,
+      priority: p.priority || null
+    }))
+  };
+  await saveSitemap(libraryPath, sitemapStructure);
+
+  log(`\n✓ Incremental update complete!`, 'info');
+  log(`  Updated: ${crawlResults.successful} pages`, 'info');
+  log(`  Unchanged: ${unchanged.length} pages`, 'info');
+  log(`  Total: ${allPages.length} pages\n`, 'info');
+
+  return {
+    library,
+    version,
+    path: libraryPath,
+    pages: allPages.length,
+    updated: true,
+    stats: {
+      unchanged: unchanged.length,
+      modified: modified.length,
+      added: added.length,
+      fetched: crawlResults.successful
+    },
     metadata
   };
 }

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import fetchDocumentation from './fetch-docs.js';
+import path from 'path';
+import fetchDocumentation, { incrementalUpdate } from './fetch-docs.js';
 import generateSkill from './generate-skill.js';
 import {
   loadConfig,
   getCacheDir,
+  getLibraryPath,
   listCachedLibraries,
   log
 } from './utils.js';
@@ -16,8 +18,82 @@ import {
   formatValidationError,
   ValidationError
 } from './validate.js';
+import {
+  compareSitemaps,
+  loadCachedSitemap,
+  formatComparisonSummary
+} from './compare-sitemaps.js';
+import { parseSitemap } from './parse-sitemap.js';
+import { RobotsChecker } from './robots-checker.js';
 
 const program = new Command();
+
+/**
+ * Check for incremental updates and return comparison results
+ * @param {string} library - Library name
+ * @param {Object} existing - Existing cached library metadata
+ * @param {Object} config - Configuration object
+ * @returns {Promise<Object|null>} Comparison results or null if can't do incremental
+ */
+async function checkIncrementalUpdate(library, existing, config) {
+  try {
+    // Load cached sitemap
+    const cacheDir = config.cache_directory || getCacheDir();
+    const libraryPath = getLibraryPath(cacheDir, library, existing.version);
+    const cachedSitemap = await loadCachedSitemap(libraryPath);
+
+    if (!cachedSitemap) {
+      log('No cached sitemap found - will do full fetch', 'debug');
+      return null;
+    }
+
+    // Only sitemap-based documentation supports incremental updates
+    if (existing.metadata.source_type !== 'sitemap') {
+      log('Source type is not sitemap - will do full fetch', 'debug');
+      return null;
+    }
+
+    // Fetch new sitemap from source
+    log('[1/3] Fetching latest sitemap...', 'info');
+    const docUrl = existing.metadata.source_url;
+
+    const robotsChecker = new RobotsChecker(docUrl, config);
+    await robotsChecker.init();
+    const robotsSitemaps = robotsChecker.getSitemaps();
+
+    const sitemapResult = await parseSitemap(docUrl, config, robotsChecker, robotsSitemaps);
+
+    // Build new sitemap structure from fullEntries
+    const newSitemap = {
+      pages: sitemapResult.fullEntries.map(entry => ({
+        url: entry.loc,
+        lastmod: entry.lastmod || null,
+        changefreq: entry.changefreq || null,
+        priority: entry.priority || null
+      }))
+    };
+
+    // Compare sitemaps
+    log('[2/3] Comparing with cached version...', 'info');
+    const comparison = compareSitemaps(cachedSitemap, newSitemap);
+
+    // Display comparison summary
+    log(formatComparisonSummary(comparison), 'info');
+
+    return {
+      comparison,
+      newSitemap,
+      sitemapResult,
+      robotsChecker,
+      libraryPath
+    };
+
+  } catch (error) {
+    log(`Incremental update check failed: ${error.message}`, 'warn');
+    log('Falling back to full fetch', 'info');
+    return null;
+  }
+}
 
 /**
  * Update cached documentation
@@ -55,10 +131,41 @@ async function updateDocs(library, options) {
       throw new Error(`No cached documentation found for ${library}. Use /fetch-docs ${library} instead.`);
     }
 
-    // Re-fetch documentation
-    const result = await fetchDocumentation(library, null, {
-      url: existing.metadata.source_url
-    });
+    let result;
+
+    // Try incremental update unless --force is specified
+    if (!options.force) {
+      const incrementalResult = await checkIncrementalUpdate(library, existing, config);
+
+      if (incrementalResult && incrementalResult.comparison.hasChanges) {
+        // Perform incremental update
+        result = await incrementalUpdate(
+          library,
+          existing.version,
+          incrementalResult.sitemapResult.fullEntries,
+          incrementalResult.comparison,
+          incrementalResult.libraryPath,
+          config,
+          incrementalResult.robotsChecker
+        );
+      } else if (incrementalResult && !incrementalResult.comparison.hasChanges) {
+        // No changes detected
+        log(`\\n✓ ${library} is already up to date\\n`, 'info');
+        return;
+      } else {
+        // Incremental update not possible, fall back to full fetch
+        log('\\nPerforming full update...', 'info');
+        result = await fetchDocumentation(library, null, {
+          url: existing.metadata.source_url
+        });
+      }
+    } else {
+      // Force full re-fetch
+      log('\\n--force flag specified, performing full re-fetch...', 'info');
+      result = await fetchDocumentation(library, null, {
+        url: existing.metadata.source_url
+      });
+    }
 
     // Regenerate skill if it was previously generated
     if (existing.metadata.skill_generated) {
@@ -66,7 +173,7 @@ async function updateDocs(library, options) {
       await generateSkill(library, result.version, {});
     }
 
-    log(`\\n✓ ${library} updated to latest version\\n`, 'info');
+    log(`\\n✓ ${library} updated successfully\\n`, 'info');
 
   } else if (options.all) {
     // Update all cached libraries

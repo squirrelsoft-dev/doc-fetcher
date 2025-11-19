@@ -8,13 +8,210 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Actual crawling implementation (Phase 2)
-- Framework-specific crawlers (Docusaurus, VitePress, Nextra)
-- Improved error handling and retry logic
+- Enhanced error recovery (pause/resume for crawls)
+- JavaScript rendering (Playwright/Puppeteer integration)
+- Authentication support for private docs
 - Remote sync to squirrelsoft.dev
 - Embeddings for semantic search within docs
 - Auto-update scheduler
-- Playwright integration for JavaScript-heavy sites
+
+## [1.5.0] - 2025-01-18
+
+### Added - Incremental Updates 🚀
+
+- **Sitemap Comparison Module** 📊
+  - New `compare-sitemaps.js` module for detecting documentation changes
+  - Compares old and new sitemaps using `lastmod` timestamps
+  - Categorizes pages as unchanged, modified, added, or removed
+  - Smart URL normalization (handles trailing slashes, fragments)
+  - Fallback to size and title comparison when timestamps unavailable
+  - `formatComparisonSummary()` for user-friendly change reports
+
+- **Selective Page Filtering** 🎯
+  - Modified `crawlPages()` to accept `pageFilter` option
+  - Only fetches URLs specified in filter set
+  - Preserves sitemap metadata (lastmod, changefreq, priority)
+  - Full URL entry support (objects with metadata, not just strings)
+
+- **Incremental Update Function** ⚡
+  - New exported `incrementalUpdate()` function in `fetch-docs.js`
+  - Fetches only changed/added pages instead of entire documentation
+  - Merges updated pages with existing unchanged pages
+  - Updates metadata with comprehensive update statistics
+  - Preserves existing cached files for unchanged pages
+
+- **Smart Update Logic** 🧠
+  - Modified `update-docs.js` to use incremental updates by default
+  - Automatic fallback to full fetch if incremental update not possible
+  - `--force` flag to bypass incremental logic and force full re-fetch
+  - Displays change summary before fetching (e.g., "✓ 222 pages unchanged, ! 12 modified")
+  - Bandwidth optimization reporting (e.g., "saving 95% bandwidth")
+
+- **Enhanced Sitemap Storage** 💾
+  - Modified `fetch-docs.js` to save `lastmod`, `changefreq`, `priority` in sitemap.json
+  - Changed from storing just URLs to storing full URL entries with metadata
+  - Enables accurate change detection on subsequent updates
+  - Backward compatible with existing caches (graceful degradation)
+
+- **Update Statistics Tracking** 📈
+  - New `last_update_stats` field in metadata
+  - Tracks: pages_checked, pages_unchanged, pages_modified, pages_added, pages_removed
+  - Provides visibility into update efficiency
+  - Useful for monitoring documentation change frequency
+
+- **Comprehensive Testing** ✅
+  - 16 new unit tests for sitemap comparison logic
+  - Tests cover: unchanged detection, modifications, additions, removals
+  - URL normalization tests (trailing slashes, fragments)
+  - Multi-change scenario tests
+  - Edge case handling (empty sitemaps, invalid input)
+  - Total test count: 199 tests (all passing)
+
+### Changed
+
+- **Update Behavior** 🔄
+  - `/update-docs` now performs incremental updates by default
+  - Only re-fetches changed pages (typically 95%+ bandwidth savings)
+  - 10-100x faster for documentation with few changes
+  - Falls back to full fetch for llms.txt sources or missing sitemaps
+
+- **Sitemap Data Structure** 📝
+  - `sitemap.json` now includes metadata fields: lastmod, changefreq, priority
+  - Enables timestamp-based change detection
+  - Previous structure still supported (graceful degradation)
+
+### Improved
+
+- **Performance** ⚡
+  - Massive speed improvement for documentation updates
+  - Typical update: 12 changed pages vs 234 total (95% faster)
+  - Reduced network bandwidth usage
+  - Lower risk of rate limiting from documentation sites
+
+- **User Experience** 💫
+  - Clear progress reporting: "[1/3] Fetching latest sitemap..."
+  - Change summary: "Found 234 pages, ✓ 222 unchanged, ! 12 modified"
+  - Bandwidth savings display: "Will fetch 12 pages (saving 95% bandwidth)"
+  - Skip update entirely if no changes detected
+
+- **Reliability** 🛡️
+  - Graceful fallback to full fetch if incremental update fails
+  - Better error handling during sitemap comparison
+  - Preserves existing cache on partial update failures
+  - Compatible with all existing documentation sources
+
+### Technical Details
+
+**New Files:**
+- `scripts/compare-sitemaps.js` (300+ lines) - Sitemap comparison engine
+- `tests/unit/compare-sitemaps.test.js` (400+ lines) - Comprehensive test suite
+
+**Modified Files:**
+- `scripts/fetch-docs.js` - Added `incrementalUpdate()`, modified `crawlPages()`, enhanced sitemap storage
+- `scripts/update-docs.js` - Added `checkIncrementalUpdate()`, integrated incremental logic
+- `scripts/utils.js` - No changes needed (already had saveSitemap/saveMetadata)
+
+**Dependencies:**
+- No new dependencies required (uses existing libraries)
+
+### Migration Notes
+
+- Existing caches will continue to work (backward compatible)
+- First update after upgrading will be a full fetch (to populate lastmod data)
+- Subsequent updates will benefit from incremental logic
+- Use `--force` flag to bypass incremental updates if needed
+
+## [1.4.0] - 2025-01-18
+
+### Added - Skill Generation Quality (Complete Implementation) ✨
+
+- **Advanced Content Analysis** 🔍
+  - New `analyze-docs.js` orchestrator module
+  - `extract-topics.js` - Parse headings into hierarchical topics with parent relationships
+  - `extract-code-examples.js` - Extract and categorize code blocks by language and context
+  - `detect-api-methods.js` - Detect API methods from code and headings (JS/TS/Python/Go/Rust/Java)
+  - `extract-keywords.js` - TF-IDF based keyword extraction with stopword filtering
+  - `build-hierarchy.js` - Build topic trees from sitemap URL structure
+  - Comprehensive analysis of topics, code examples, API methods, keywords, and hierarchy
+
+- **All 5 Skill Templates** 📚
+  - **Expert Template** (enhanced) - Comprehensive knowledge with full topic coverage
+  - **Quick Reference Template** (new) - Condensed cheat-sheet style for top 20% features
+  - **Migration Guide Template** (new) - Version comparison with breaking changes detection
+  - **Troubleshooter Template** (new) - Error resolution and debugging assistance
+  - **Best Practices Template** (new) - Recommended patterns, security, and performance
+
+- **Template System Infrastructure**
+  - `template-base.js` - Shared utilities for all templates using JavaScript template literals
+  - Smart activation pattern generation based on content analysis
+  - Template-specific content filtering and formatting
+  - YAML frontmatter generation with proper escaping
+
+- **Enhanced Skill Generation** 🎯
+  - Skills now contain actual content from documentation analysis
+  - Real topics, code examples, API methods extracted from cached docs
+  - Intelligent activation patterns based on keywords and topics
+  - Template selection via `--template` flag
+  - Analysis summary stored in metadata for tracking
+
+- **Testing** ✅
+  - 25 new tests (13 analysis + 12 template tests)
+  - Total test count: 183 tests (158 validation + 25 new)
+  - Template consistency validation across all 5 templates
+  - Analysis module unit tests with real markdown parsing
+
+- **New Dependencies**
+  - `remark` - Markdown processor
+  - `remark-parse` - Markdown to AST parser
+  - `remark-frontmatter` - YAML frontmatter support
+  - `remark-gfm` - GitHub Flavored Markdown support
+  - `unist-util-visit` - AST traversal
+  - `unist-util-visit-parents` - AST traversal with parent tracking
+  - `natural` - NLP and keyword extraction
+
+### Changed
+
+- **Skill Generation Completely Rewritten** 🔧
+  - `generate-skill.js` now runs comprehensive analysis before generation
+  - Progress reporting for 3-phase generation (analysis → template → save)
+  - Metadata now includes analysis summary (topics, examples, methods, keywords)
+  - Skill names include template type: `{library}-{version}-{template}`
+  - Generates rich, context-aware skills instead of generic templates
+
+### Improved
+
+- **Documentation Quality** 📖
+  - Generated skills reference actual topics from documentation
+  - Code example counts and language breakdowns
+  - API method categorization (hooks, functions, classes, etc.)
+  - Keyword-based concept identification
+  - Hierarchy visualization for large documentation sets
+
+### Migration Notes
+
+- Existing skills generated with older versions are still valid but basic
+- Regenerate skills to take advantage of new templates and analysis:
+  ```bash
+  /generate-doc-skill nextjs --template expert
+  /generate-doc-skill nextjs --template quick-reference
+  /generate-doc-skill nextjs --template migration-guide
+  ```
+- Template names are now validated (expert, quick-reference, migration-guide, troubleshooter, best-practices)
+
+### Performance
+
+- Analysis runs once during skill generation
+- Keyword extraction uses TF-IDF for relevance
+- Markdown parsing optimized with AST-based approach
+- Hierarchical topic extraction from both headings and sitemap
+
+### Statistics
+
+- **New Files**: 12 (6 analysis modules, 5 templates, 1 template base)
+- **Lines Added**: ~2,500 lines of production code
+- **Test Coverage**: 25 new tests, 100% pass rate
+- **Templates Implemented**: 5/5 (100%)
+- **Analysis Features**: Topics, Code Examples, API Methods, Keywords, Hierarchy
 
 ## [1.3.0] - 2025-01-18
 

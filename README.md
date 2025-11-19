@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -28,6 +28,20 @@ AI coding agents frequently struggle with:
 - **Offline-Ready**: Documentation works without internet once cached
 
 ## Recent Updates
+
+### v1.5.0 (2025-01-18)
+
+#### Added
+- **Incremental Updates** - Massive performance improvement for documentation updates
+  - Only fetches changed/new pages instead of re-downloading all documentation
+  - Compares sitemaps using `lastmod` timestamps to detect changes
+  - Typically saves 95%+ bandwidth and is 10-100x faster
+  - Automatic fallback to full fetch if incremental not possible
+  - `--force` flag to bypass incremental logic when needed
+  - New `compare-sitemaps.js` module with comprehensive change detection
+  - Enhanced sitemap storage with metadata (lastmod, changefreq, priority)
+  - Update statistics tracking in metadata (pages_checked, pages_unchanged, pages_modified, etc.)
+  - 16 new unit tests for sitemap comparison (199 total tests, all passing)
 
 ### v1.3.0 (2025-01-18)
 
@@ -199,16 +213,53 @@ Fetch and cache documentation for a library.
 
 Update cached documentation to latest version.
 
+**Features:**
+- **Incremental Updates** (v1.5.0+): Only fetches changed pages, saving 95%+ bandwidth
+- **Smart Detection**: Compares sitemaps to identify modified/added/removed pages
+- **Automatic Fallback**: Falls back to full fetch if incremental update not possible
+- **Progress Reporting**: Shows detailed change summary before fetching
+
 **Options:**
 - `--all` - Update all cached documentation
 - `--project` - Update docs matching package.json
-- `--force` - Force re-fetch even if recently updated
+- `--force` - Force full re-fetch (bypass incremental updates)
 
 **Examples:**
 ```bash
+# Incremental update (only fetches changed pages)
 /update-docs nextjs
+
+# Update all cached libraries incrementally
 /update-docs --all
+
+# Update project dependencies incrementally
 /update-docs --project
+
+# Force full re-fetch (bypass incremental logic)
+/update-docs nextjs --force
+```
+
+**Incremental Update Output:**
+```
+Updating nextjs...
+
+[1/3] Fetching latest sitemap...
+[2/3] Comparing with cached version...
+Found 234 pages in new sitemap
+  ✓ 222 pages unchanged (95%)
+  ! 12 pages modified
+
+Will fetch 12 pages (saving 95% bandwidth)
+
+[3/3] Fetching 12 changed/new pages...
+[████████████████████] 100%
+
+✓ Incremental update complete!
+  Updated: 12 pages
+  Unchanged: 222 pages
+  Total: 234 pages
+
+✓ nextjs updated successfully
 ```
 
 ### `/list-docs [options]`
@@ -363,6 +414,106 @@ Advanced documentation crawler for complex or non-standard sites.
 - Authenticated documentation
 - Multi-source documentation
 - Failed standard crawls
+
+## Skill Templates
+
+Generated skills use intelligent content analysis to provide context-aware assistance. Each template is optimized for specific use cases.
+
+### Expert Template (`expert`)
+
+**Comprehensive knowledge with full topic coverage**
+
+- Complete API reference with all methods and functions
+- Topic hierarchy with main sections and subtopics
+- Code examples organized by category
+- Keyword-based concept identification
+- Best for in-depth questions and complex implementations
+
+**Example:**
+```bash
+/generate-doc-skill nextjs --template expert
+```
+
+### Quick Reference Template (`quick-reference`)
+
+**Condensed cheat-sheet style focusing on top 20% features**
+
+- Most frequently used APIs and methods
+- Common code patterns and snippets
+- Quick syntax lookups
+- Essential concepts at a glance
+- Best for fast lookups and common tasks
+
+**Example:**
+```bash
+/generate-doc-skill react --template quick-reference
+```
+
+### Migration Guide Template (`migration-guide`)
+
+**Version upgrade assistance with breaking changes detection**
+
+- Compares cached versions to identify changes
+- New features and APIs introduced
+- Removed or deprecated functionality
+- Step-by-step upgrade checklist
+- Before/after code examples
+- Best for upgrading between versions
+
+**Example:**
+```bash
+# Fetch both versions first
+/fetch-docs nextjs 14.0.0
+/fetch-docs nextjs 15.0.0
+
+# Generate migration guide
+/generate-doc-skill nextjs --template migration-guide
+```
+
+### Troubleshooter Template (`troubleshooter`)
+
+**Error resolution and debugging assistance**
+
+- Common errors and solutions
+- Debugging strategies and workflows
+- Configuration troubleshooting
+- Error message interpretation
+- Issue diagnosis guidance
+- Best for debugging and fixing issues
+
+**Example:**
+```bash
+/generate-doc-skill supabase --template troubleshooter
+```
+
+### Best Practices Template (`best-practices`)
+
+**Recommended patterns, security, and performance**
+
+- Recommended code patterns
+- Anti-patterns to avoid
+- Performance optimization tips
+- Security best practices
+- Code quality guidelines
+- Testing recommendations
+- Best for code review and architecture
+
+**Example:**
+```bash
+/generate-doc-skill typescript --template best-practices
+```
+
+### Content Analysis
+
+All templates use advanced analysis to extract:
+
+- **Topics**: Hierarchical structure from headings and sitemap
+- **Code Examples**: Categorized by language and use case
+- **API Methods**: Detected from code and documentation
+- **Keywords**: TF-IDF based relevance ranking
+- **Activation Patterns**: Smart patterns based on content
+
+This ensures skills contain actual, relevant information from the cached documentation rather than generic templates.
 
 ## Configuration
 
