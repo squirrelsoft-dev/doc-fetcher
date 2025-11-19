@@ -16,6 +16,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-update scheduler
 - Playwright integration for JavaScript-heavy sites
 
+## [1.3.0] - 2025-01-18
+
+### Added
+- **Comprehensive Input Validation** 🛡️
+  - New `validate.js` module with 6 validation functions
+  - `validateLibraryName()` - Validates library names with scoped package support
+  - `validateVersion()` - Validates semantic versions and special keywords
+  - `validateUrl()` - Validates HTTP/HTTPS URLs with security checks
+  - `validatePath()` - Validates file paths with existence and type checking
+  - `validateTemplate()` - Validates skill template names
+  - `ValidationError` class with contextual error information
+  - Comprehensive JSDoc annotations for all functions
+- **Security Features**
+  - Path traversal prevention (blocks `../`, `./`, `\\`)
+  - Null byte injection prevention
+  - Localhost and private IP blocking by default
+  - Scoped package validation for npm packages
+  - Input length limits (prevents DoS attacks)
+- **Error Messages**
+  - `formatValidationError()` - Formats errors with field, value, and suggestions
+  - Clear, actionable error messages with examples
+  - Contextual suggestions for common mistakes
+- **Test Coverage**
+  - 72 comprehensive unit tests for validation module
+  - 100% test pass rate
+  - Tests for valid inputs, invalid inputs, edge cases, and options
+  - Temporary file fixtures for path validation tests
+
+### Changed
+- **All Commands Now Validate Inputs**
+  - `fetch-docs.js` - Validates library, version, URL
+  - `update-docs.js` - Validates library, project path
+  - `list-docs.js` - Validates project path
+  - `generate-skill.js` - Validates library, version, template, output path
+- **Updated Documentation**
+  - Added "Input Validation" section to README.md
+  - Documented all validation rules and constraints
+  - Included error message examples
+  - Updated version badge to v1.3.0
+
+### Security
+- Path traversal attack prevention
+- Null byte injection prevention
+- URL validation with localhost/private IP blocking
+- Input sanitization and normalization
+
 ## [1.2.0] - 2025-01-18
 
 ### Added

@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -28,6 +28,19 @@ AI coding agents frequently struggle with:
 - **Offline-Ready**: Documentation works without internet once cached
 
 ## Recent Updates
+
+### v1.3.0 (2025-01-18)
+
+#### Added
+- **Comprehensive Input Validation** - Prevents common errors and security issues
+  - Validates library names (with scoped package support)
+  - Validates version strings (semantic versioning + special keywords)
+  - Validates URLs (blocks localhost/private IPs by default)
+  - Validates file paths (with existence and type checking)
+  - Validates template names (must be one of 5 allowed templates)
+  - Contextual error messages with field name, value, and suggestions
+  - Security features: path traversal prevention, null byte detection
+  - 72 comprehensive unit tests with 100% pass rate
 
 ### v1.1.0 (2025-01-18)
 
@@ -228,6 +241,57 @@ Generate a Claude Code skill from cached documentation.
 /generate-doc-skill nextjs
 /generate-doc-skill nextjs --template quick-reference
 /generate-doc-skill supabase --template best-practices
+```
+
+## Input Validation
+
+All commands include comprehensive input validation to prevent common errors and security issues.
+
+### Validated Inputs
+
+**Library Names:**
+- Must be 1-100 characters
+- Alphanumeric with hyphens, underscores, periods
+- Supports scoped packages (e.g., `@types/node`)
+- No path traversal sequences (`../`, `./`, `\\`)
+- Clear error messages with examples
+
+**Version Strings:**
+- Semantic versioning (e.g., `1.2.3`, `2.0.0-beta`)
+- Short versions (e.g., `1.2`, `1`)
+- Special keywords: `latest`, `next`, `canary`, `beta`, `alpha`
+- Removes `v` prefix automatically
+
+**URLs:**
+- Must be valid HTTP/HTTPS URLs
+- Blocks localhost and private IPs by default
+- Maximum 2048 characters
+- Protocol required
+
+**File Paths:**
+- Validates existence when required
+- Checks for directories vs. files
+- Prevents null byte injection
+- Resolves to absolute paths
+
+**Template Names:**
+- Must be one of: `expert`, `quick-reference`, `migration-guide`, `troubleshooter`, `best-practices`
+- Case-insensitive
+
+### Error Messages
+
+Validation errors include:
+- Clear explanation of the problem
+- The field that failed validation
+- The invalid value provided
+- Suggested fix or valid examples
+
+**Example:**
+```
+✗ Validation Error: Library name contains invalid characters
+  Field: library
+  Provided: "my lib!"
+  Suggestion: Use only letters, numbers, hyphens, underscores, periods, and @ for scoped packages (e.g., @org/package)
 ```
 
 ## Skills

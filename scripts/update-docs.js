@@ -10,6 +10,12 @@ import {
   log
 } from './utils.js';
 import { detectDependencies, getSuggestions } from './detect-dependencies.js';
+import {
+  validateLibraryName,
+  validatePath,
+  formatValidationError,
+  ValidationError
+} from './validate.js';
 
 const program = new Command();
 
@@ -17,6 +23,22 @@ const program = new Command();
  * Update cached documentation
  */
 async function updateDocs(library, options) {
+  // Validate inputs
+  try {
+    if (library) {
+      library = validateLibraryName(library);
+    }
+
+    if (options.path) {
+      options.path = await validatePath(options.path, 'path', { mustExist: true, mustBeDirectory: true });
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new Error(formatValidationError(error));
+    }
+    throw error;
+  }
+
   // Load config
   const config = await loadConfig();
   const cacheDir = config.cache_directory || getCacheDir();

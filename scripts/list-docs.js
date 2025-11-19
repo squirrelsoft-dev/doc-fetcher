@@ -10,6 +10,11 @@ import {
   log
 } from './utils.js';
 import { detectDependencies, getSuggestions } from './detect-dependencies.js';
+import {
+  validatePath,
+  formatValidationError,
+  ValidationError
+} from './validate.js';
 
 const program = new Command();
 
@@ -59,6 +64,16 @@ async function listDocs(options) {
  * List documentation for current project
  */
 async function listProjectDocs(projectPath = process.cwd()) {
+  // Validate project path
+  try {
+    projectPath = await validatePath(projectPath, 'project path', { mustExist: true, mustBeDirectory: true });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new Error(formatValidationError(error));
+    }
+    throw error;
+  }
+
   console.log('\\nProject Documentation Analysis:\\n');
 
   // Detect dependencies

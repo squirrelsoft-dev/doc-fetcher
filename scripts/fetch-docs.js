@@ -23,6 +23,13 @@ import {
   getDirSize,
   ProgressBar
 } from './utils.js';
+import {
+  validateLibraryName,
+  validateVersion,
+  validateUrl,
+  formatValidationError,
+  ValidationError
+} from './validate.js';
 
 const program = new Command();
 
@@ -182,6 +189,21 @@ async function crawlPages(urls, libraryPath, config, robotsChecker) {
  * Main fetch documentation function
  */
 async function fetchDocumentation(library, version, options) {
+  // Validate inputs
+  try {
+    library = validateLibraryName(library);
+    version = validateVersion(version);
+
+    if (options.url) {
+      options.url = validateUrl(options.url);
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new Error(formatValidationError(error));
+    }
+    throw error;
+  }
+
   log(`\\nFetching documentation for ${library}${version ? ` v${version}` : ''}...\\n`, 'info');
 
   // Load config

@@ -13,6 +13,14 @@ import {
   log,
   formatRelativeTime
 } from './utils.js';
+import {
+  validateLibraryName,
+  validateVersion,
+  validateTemplate,
+  validatePath,
+  formatValidationError,
+  ValidationError
+} from './validate.js';
 
 const program = new Command();
 
@@ -110,6 +118,25 @@ async function saveSkill(skillName, content) {
  * Generate skill from cached documentation
  */
 async function generateSkill(library, version, options) {
+  // Validate inputs
+  try {
+    library = validateLibraryName(library);
+    version = validateVersion(version);
+
+    if (options.template) {
+      options.template = validateTemplate(options.template);
+    }
+
+    if (options.output) {
+      options.output = await validatePath(options.output, 'output path');
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new Error(formatValidationError(error));
+    }
+    throw error;
+  }
+
   log(`\\nGenerating skill for ${library}${version ? ` v${version}` : ''}...\\n`, 'info');
 
   // Load config
