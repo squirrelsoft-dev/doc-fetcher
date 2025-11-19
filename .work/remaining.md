@@ -98,9 +98,12 @@ Coverage achieved:
 - ✓ Generates metadata (.doc-reference.json)
 - ✓ Simple activation patterns
 - ✓ Updates library metadata
+- ✓ Template name validation (v1.3.0) - Validates 5 allowed template names
 
 **What's missing:**
-- ✗ Only 1 template (basic "expert") vs. 5 specified templates
+- ✗ Only 1 template (basic "expert") implemented vs. 5 specified templates
+  - Template names validated: expert, quick-reference, migration-guide, troubleshooter, best-practices
+  - But only "expert" template actually generates content
 - ✗ No content analysis from cached docs
 - ✗ No code example extraction
 - ✗ No API method detection
@@ -108,9 +111,9 @@ Coverage achieved:
 - ✗ No version comparison for migration guides
 - ✗ No advanced activation pattern generation
 
-**Gap:** Skills are created but contain minimal content - they don't analyze cached documentation to create rich, context-aware skills as specified.
+**Gap:** Skills are created but contain minimal content - they don't analyze cached documentation to create rich, context-aware skills as specified. Template validation is in place, but template implementations are missing.
 
-**Impact:** Generated skills provide basic activation but don't offer the deep, template-specific knowledge promised in the spec.
+**Impact:** Generated skills provide basic activation but don't offer the deep, template-specific knowledge promised in the spec. Input validation prevents invalid template names, but only one template actually works.
 
 ---
 
