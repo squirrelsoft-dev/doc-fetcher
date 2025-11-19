@@ -8,10 +8,11 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Get the cache directory path
- * Defaults to .claude/docs in the current project directory
+ * Defaults to .claude/docs in the user's home directory
  */
 export function getCacheDir() {
-  return path.join(process.cwd(), '.claude', 'docs');
+  const home = os.homedir();
+  return path.join(home, '.claude', 'docs');
 }
 
 /**
@@ -30,28 +31,19 @@ export function getPluginDir() {
 
 /**
  * Load configuration from doc-fetcher-config.json
- * Tries project config first, then falls back to plugin config
+ * Loads from plugin config in ~/.claude/plugins/cache/doc-fetcher
  */
 export async function loadConfig() {
-  // Try project config first, then plugin config
-  const projectConfigPath = path.join(process.cwd(), 'doc-fetcher-config.json');
   const pluginConfigPath = path.join(getPluginDir(), 'doc-fetcher-config.json');
 
-  let configPath = pluginConfigPath;
   try {
-    await fs.access(projectConfigPath);
-    configPath = projectConfigPath;
-  } catch {
-    // Use plugin config as fallback
-  }
-
-  try {
-    const data = await fs.readFile(configPath, 'utf-8');
+    const data = await fs.readFile(pluginConfigPath, 'utf-8');
     const config = JSON.parse(data);
 
-    // Resolve relative cache_directory paths relative to project root
+    // Resolve relative cache_directory paths relative to user's home directory
     if (config.cache_directory && !path.isAbsolute(config.cache_directory)) {
-      config.cache_directory = path.join(process.cwd(), config.cache_directory);
+      const home = os.homedir();
+      config.cache_directory = path.join(home, '.claude', config.cache_directory);
     }
 
     return config;

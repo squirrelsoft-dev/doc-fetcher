@@ -6,7 +6,7 @@ argument-hint: <library> [version] [--url <custom-url>]
 
 # Fetch Documentation
 
-Fetch and cache documentation for a specified library, creating a local snapshot in the current project's `.claude/docs` directory for accurate, version-specific AI context.
+Fetch and cache documentation for a specified library, creating a local snapshot in `~/.claude/docs` for accurate, version-specific AI context.
 
 ## Current Context
 
@@ -24,11 +24,10 @@ When the user invokes this command, follow these steps:
 
 2. **Run Fetch Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/fetch-docs.js $ARGUMENTS`
-   - The script automatically operates on the **current project directory** (`process.cwd()`)
    - The script will:
      - Discover documentation format (llms.txt, claude.txt, or sitemap.xml)
      - Detect the documentation framework (Docusaurus, VitePress, Nextra, etc.)
-     - Crawl and cache pages to **`.claude/docs/[library]/[version]/`** in the current project
+     - Crawl and cache pages to **`~/.claude/docs/[library]/[version]/`**
      - Respect robots.txt and rate limits
      - Save metadata in `index.json` and structure in `sitemap.json`
    - Monitor progress and show status to the user
@@ -36,7 +35,7 @@ When the user invokes this command, follow these steps:
 3. **Handle Results**:
    - If successful: Report:
      - Number of pages fetched
-     - Storage location (`.claude/docs/[library]/[version]/` in current project)
+     - Storage location (`~/.claude/docs/[library]/[version]/`)
      - Total size
      - Whether a skill was auto-generated
    - Show next steps (how to use the cached docs or generate a skill)
@@ -54,8 +53,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The script automatically detects the project directory from where the command is run
-- The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
+- Documentation is cached globally in `~/.claude/docs` and shared across all projects
+- The cache directory is configured in `doc-fetcher-config.json` and defaults to `~/.claude/docs`
 - Fetching can take several minutes for large documentation sets
 - Use specific versions (e.g., `/fetch-docs nextjs 15.0.0`) to match your project's package.json
 - The fetched docs are stored locally and won't be updated automatically (use `/update-docs` for that)

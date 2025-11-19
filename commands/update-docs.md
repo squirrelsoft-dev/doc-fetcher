@@ -6,7 +6,7 @@ argument-hint: [library] [--all] [--project] [--force]
 
 # Update Documentation
 
-Check for and update outdated documentation in the current project's `.claude/docs` directory.
+Check for and update outdated documentation in `~/.claude/docs`.
 
 ## Current Context
 
@@ -22,8 +22,7 @@ When the user invokes this command, follow these steps:
 
 2. **Run Update Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/update-docs.js $ARGUMENTS`
-   - The script automatically operates on the **current project directory** (`process.cwd()`)
-   - It will check the project's `.claude/docs` directory for cached documentation
+   - It will check `~/.claude/docs` for cached documentation
    - Wait for completion and capture the output
 
 3. **Handle Results**:
@@ -42,8 +41,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The script automatically detects the project directory from where the command is run
-- The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
+- Documentation is cached globally in `~/.claude/docs` and shared across all projects
+- The cache directory is configured in `doc-fetcher-config.json` and defaults to `~/.claude/docs`
 - Updates check for newer versions and re-fetch if available
 - Use `--force` to re-fetch even if recently updated
-- The `--project` flag reads the project's `package.json` dependencies and updates matching docs
+- The `--project` flag reads the current project's dependencies and updates matching docs in the global cache

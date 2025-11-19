@@ -6,7 +6,7 @@ argument-hint: [--project] [--verbose]
 
 # List Documentation
 
-Display all cached documentation from the current project's `.claude/docs` directory including versions, sizes, update times, and associated skills.
+Display all cached documentation from `~/.claude/docs` including versions, sizes, update times, and associated skills.
 
 ## Current Context
 
@@ -23,8 +23,7 @@ When the user invokes this command, follow these steps:
 
 2. **Run List Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/list-docs.js $ARGUMENTS`
-   - The script automatically operates on the **current project directory** (`process.cwd()`)
-   - The script will scan the project's **`.claude/docs` directory** and display:
+   - The script will scan **`~/.claude/docs`** and display:
      - Library names and versions
      - Number of pages cached
      - Storage sizes
@@ -55,8 +54,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The script automatically detects the project directory from where the command is run
+- Documentation is cached globally in `~/.claude/docs` and shared across all projects
 - The list command is fast (reads index files only, doesn't scan page content)
-- The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
-- Use `--project` to see which of your project's dependencies have cached documentation
+- The cache directory is configured in `doc-fetcher-config.json` and defaults to `~/.claude/docs`
+- Use `--project` to see which of your current project's dependencies have cached documentation
 - Use `--verbose` for complete details including source URLs and local paths

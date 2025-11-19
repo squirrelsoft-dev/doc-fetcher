@@ -28,6 +28,32 @@ AI coding agents frequently struggle with:
 - **Incremental Updates**: Only re-fetch changed pages when updating
 - **Offline-Ready**: Documentation works without internet once cached
 
+## Architecture
+
+Doc Fetcher uses a **global cache architecture** - documentation and skills are stored in your home directory and shared across all projects:
+
+```
+~/.claude/
+├── docs/              # Cached documentation (shared across all projects)
+│   ├── nextjs/
+│   │   ├── 14.2.3/   # Multiple versions supported
+│   │   └── 15.0.3/
+│   ├── react/
+│   │   └── 18.2.0/
+│   └── supabase/
+│       └── 2.39.0/
+└── skills/            # Generated skills (available globally)
+    ├── nextjs-15-expert/
+    ├── react-18-expert/
+    └── supabase-2-expert/
+```
+
+**Benefits:**
+- Documentation is cached once and reused across all projects
+- No duplicate downloads - saves bandwidth and disk space
+- Skills work everywhere - generate once, use in any project
+- Project directories stay clean - no large `.claude/docs` folders
+
 ## Recent Updates
 
 ### v1.6.0 (2025-01-18)

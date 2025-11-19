@@ -6,7 +6,7 @@ argument-hint: <library> [version] [--template <template-name>] [--output <path>
 
 # Generate Documentation Skill
 
-Create a Claude Code skill from cached documentation in the current project's `.claude/docs` directory, enabling version-specific expertise and accurate AI guidance.
+Create a Claude Code skill from cached documentation in `~/.claude/docs`, enabling version-specific expertise and accurate AI guidance. Skills are saved to `~/.claude/skills`.
 
 ## Current Context
 
@@ -25,12 +25,11 @@ When the user invokes this command, follow these steps:
 
 2. **Run Generate Skill Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/generate-skill.js $ARGUMENTS`
-   - The script automatically operates on the **current project directory** (`process.cwd()`)
    - The script will:
-     - Locate cached docs in the project's **`.claude/docs/[library]/[version]/`** directory
+     - Locate cached docs in **`~/.claude/docs/[library]/[version]/`**
      - Analyze the documentation structure and content
      - Generate a skill file with version-specific expertise
-     - Create proper directory structure for the skill
+     - Save skill to **`~/.claude/skills/[library]-[version]-[template]/`**
      - Link the skill to the cached documentation
    - Monitor progress and capture output
 
@@ -55,8 +54,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The script automatically detects the project directory from where the command is run
-- Skills are generated from documentation cached in the project's `.claude/docs` directory
+- Documentation is cached globally in `~/.claude/docs` and skills in `~/.claude/skills`
+- Skills are available across all projects (global Claude Code skills)
 - The generated skill references the specific version of documentation
 - Skills can auto-activate based on package.json dependencies or file patterns
 - Use `--template` to customize skill focus (expert, quick-reference, troubleshooter, etc.)

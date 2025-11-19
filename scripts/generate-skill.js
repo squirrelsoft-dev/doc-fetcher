@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { verifyDependencies } from './check-dependencies.js';
 import {
   loadConfig,
@@ -61,7 +62,7 @@ async function generateSkillContent(library, metadata, docsPath, cacheDir, templ
   const templateParams = {
     library,
     version: metadata.version,
-    docsPath: path.relative(process.cwd(), docsPath),
+    docsPath: docsPath,  // Use absolute path since docs are in user's home directory
     cacheDir,
     analysis,
     activationPatterns
@@ -111,8 +112,8 @@ async function generateSkillContent(library, metadata, docsPath, cacheDir, templ
  * Save skill to file
  */
 async function saveSkill(skillName, content, template) {
-  const pluginDir = getPluginDir();
-  const skillsDir = path.join(pluginDir, 'skills');
+  const home = os.homedir();
+  const skillsDir = path.join(home, '.claude', 'skills');
   const skillDir = path.join(skillsDir, skillName);
 
   await ensureDir(skillDir);

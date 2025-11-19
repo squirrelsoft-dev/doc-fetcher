@@ -1,5 +1,5 @@
 {
-  "cache_directory": ".claude/docs",
+  "cache_directory": "docs",
   "auto_generate_skills": true,
   "auto_detect_dependencies": true,
   "remote_sync": false,
