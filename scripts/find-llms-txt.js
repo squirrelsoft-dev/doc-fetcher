@@ -205,6 +205,56 @@ function extractVersion(content) {
 }
 
 /**
+ * Extract all URLs from markdown content
+ * @param {string} content - Markdown content
+ * @param {string} baseUrl - Base URL for resolving relative links
+ * @returns {Array<string>} Array of absolute URLs
+ */
+export function extractUrlsFromContent(content, baseUrl) {
+  const urls = new Set();
+
+  // Match markdown links: [text](url)
+  const markdownLinkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+
+  while ((match = markdownLinkPattern.exec(content)) !== null) {
+    const url = match[2];
+
+    // Skip anchors and mailto links
+    if (url.startsWith('#') || url.startsWith('mailto:')) {
+      continue;
+    }
+
+    // Convert relative URLs to absolute
+    let absoluteUrl;
+    try {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        absoluteUrl = url;
+      } else if (url.startsWith('/')) {
+        const base = new URL(baseUrl);
+        absoluteUrl = `${base.protocol}//${base.host}${url}`;
+      } else {
+        // Relative path
+        absoluteUrl = new URL(url, baseUrl).href;
+      }
+
+      // Only include URLs from the same domain as baseUrl
+      const baseHost = new URL(baseUrl).host;
+      const urlHost = new URL(absoluteUrl).host;
+
+      if (baseHost === urlHost) {
+        urls.add(absoluteUrl);
+      }
+    } catch (error) {
+      // Skip invalid URLs
+      continue;
+    }
+  }
+
+  return Array.from(urls);
+}
+
+/**
  * Find AI-optimized documentation (llms.txt, claude.txt) for a base URL
  */
 export async function findAIOptimizedDocs(baseUrl, config, robotsChecker) {
@@ -219,7 +269,8 @@ export async function findAIOptimizedDocs(baseUrl, config, robotsChecker) {
     version: null,
     content: null,
     validation: null,
-    checkedUrls: []
+    checkedUrls: [],
+    extractedUrls: []
   };
 
   // Try each location
@@ -247,6 +298,9 @@ export async function findAIOptimizedDocs(baseUrl, config, robotsChecker) {
         const validation = validateContent(fetchResult.content);
 
         if (validation.valid) {
+          // Extract URLs from content
+          const extractedUrls = extractUrlsFromContent(fetchResult.content, normalizedBase);
+
           results.found = true;
           results.type = location.split('/').pop();
           results.url = testUrl;
@@ -254,8 +308,10 @@ export async function findAIOptimizedDocs(baseUrl, config, robotsChecker) {
           results.content = fetchResult.content;
           results.version = extractVersion(fetchResult.content);
           results.validation = validation;
+          results.extractedUrls = extractedUrls;
 
           log(`  ✓ Validation passed`, 'info');
+          log(`  ✓ Extracted ${extractedUrls.length} URLs from content`, 'info');
 
           if (validation.warning) {
             log(`  ⚠ ${validation.reason}`, 'warn');

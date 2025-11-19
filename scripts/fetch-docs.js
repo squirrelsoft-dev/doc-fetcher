@@ -446,18 +446,66 @@ async function fetchDocumentation(library, version, options) {
 
   if (aiDocsResult.found) {
     log(`✓ Found ${aiDocsResult.type} (${formatBytes(aiDocsResult.size)})`, 'info');
-    log('Using AI-optimized format instead of crawling', 'info');
 
-    // Save llms.txt content with original filename
-    sourceType = 'llms.txt';
-    sourceUrl = aiDocsResult.url;
-    pages = [{
-      url: aiDocsResult.url,
-      title: `${library} Documentation`,
-      filename: aiDocsResult.type,  // Preserve original filename (llms.txt, llms-full.txt, claude.txt, etc.)
-      size: aiDocsResult.size,
-      content: aiDocsResult.content
-    }];
+    const fetchUrlsFromLlms = config.fetch_llms_urls !== false; // Default true
+
+    if (fetchUrlsFromLlms && aiDocsResult.extractedUrls.length > 0) {
+      log(`Found ${aiDocsResult.extractedUrls.length} URLs in ${aiDocsResult.type}`, 'info');
+      log('Fetching individual pages...', 'info');
+
+      sourceType = 'llms.txt';
+      sourceUrl = aiDocsResult.url;
+
+      // Save the llms.txt file itself as a page
+      const llmsPage = {
+        url: aiDocsResult.url,
+        title: `${library} Documentation`,
+        filename: aiDocsResult.type,
+        size: aiDocsResult.size,
+        content: aiDocsResult.content
+      };
+
+      // Create initial checkpoint for URL fetching if enabled and not resuming
+      if (enableCheckpoint && !resumeCheckpoint) {
+        await createInitialCheckpoint(libraryPath, {
+          operation: 'fetch',
+          library,
+          version: version || 'latest',
+          totalPages: aiDocsResult.extractedUrls.length + 1, // +1 for llms.txt itself
+          urls: [aiDocsResult.url, ...aiDocsResult.extractedUrls],
+          sourceUrl: docUrl,
+          sourceType: 'llms.txt',
+          framework: aiDocsResult.type
+        });
+        resumeCheckpoint = await loadCheckpoint(libraryPath);
+      }
+
+      // Fetch all URLs from llms.txt
+      const fetchedPages = await fetchPages(
+        aiDocsResult.extractedUrls,
+        config,
+        robotsChecker,
+        library,
+        resumeCheckpoint,
+        libraryPath
+      );
+
+      // Combine llms.txt file with fetched pages
+      pages = [llmsPage, ...fetchedPages];
+    } else {
+      log('Saving AI-optimized file only (not fetching URLs)', 'info');
+
+      // Save llms.txt content only
+      sourceType = 'llms.txt';
+      sourceUrl = aiDocsResult.url;
+      pages = [{
+        url: aiDocsResult.url,
+        title: `${library} Documentation`,
+        filename: aiDocsResult.type,
+        size: aiDocsResult.size,
+        content: aiDocsResult.content
+      }];
+    }
   } else {
     // 2. Parse sitemap.xml
     log('\\n[3/7] Parsing sitemap.xml...', 'info');

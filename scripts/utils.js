@@ -53,6 +53,7 @@ export async function loadConfig() {
       cache_directory: getCacheDir(),
       auto_generate_skills: true,
       auto_detect_dependencies: true,
+      fetch_llms_urls: true,
       remote_sync: false,
       crawl_delay_ms: 1000,
       max_pages_per_fetch: 500,
