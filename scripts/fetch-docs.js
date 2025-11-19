@@ -465,14 +465,17 @@ async function fetchDocumentation(library, version, options) {
         content: aiDocsResult.content
       };
 
+      // Ensure library directory exists before creating checkpoint
+      await ensureDir(libraryPath);
+
       // Create initial checkpoint for URL fetching if enabled and not resuming
       if (enableCheckpoint && !resumeCheckpoint) {
         await createInitialCheckpoint(libraryPath, {
           operation: 'fetch',
           library,
           version: version || 'latest',
-          totalPages: aiDocsResult.extractedUrls.length + 1, // +1 for llms.txt itself
-          urls: [aiDocsResult.url, ...aiDocsResult.extractedUrls],
+          totalPages: aiDocsResult.extractedUrls.length,
+          urls: aiDocsResult.extractedUrls,
           sourceUrl: docUrl,
           sourceType: 'llms.txt',
           framework: aiDocsResult.type
@@ -480,18 +483,22 @@ async function fetchDocumentation(library, version, options) {
         resumeCheckpoint = await loadCheckpoint(libraryPath);
       }
 
-      // Fetch all URLs from llms.txt
-      const fetchedPages = await fetchPages(
-        aiDocsResult.extractedUrls,
-        config,
-        robotsChecker,
-        library,
-        resumeCheckpoint,
-        libraryPath
-      );
+      // Crawl all URLs from llms.txt
+      const crawlResults = await crawlPages(aiDocsResult.extractedUrls, libraryPath, config, robotsChecker, {
+        enableCheckpoint,
+        checkpointData: resumeCheckpoint
+      });
 
-      // Combine llms.txt file with fetched pages
-      pages = [llmsPage, ...fetchedPages];
+      // Combine llms.txt file with crawled pages
+      pages = [llmsPage, ...crawlResults.pages];
+
+      log(`\n✓ Crawled ${crawlResults.successful} pages from ${aiDocsResult.type}`, 'info');
+      if (crawlResults.skipped > 0) {
+        log(`⚠ Skipped ${crawlResults.skipped} pages (disallowed by robots.txt)`, 'warn');
+      }
+      if (crawlResults.failed > 0) {
+        log(`✗ Failed to crawl ${crawlResults.failed} pages`, 'warn');
+      }
     } else {
       log('Saving AI-optimized file only (not fetching URLs)', 'info');
 
