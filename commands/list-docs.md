@@ -22,8 +22,8 @@ When the user invokes this command, follow these steps:
    - If no arguments: show default view (all cached docs)
 
 2. **Run List Command**:
-   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/list-docs.js $ARGUMENTS --path "$(pwd)"`
-   - The `--path` argument tells the script to operate on the **current project directory**
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/list-docs.js $ARGUMENTS`
+   - The script automatically operates on the **current project directory** (`process.cwd()`)
    - The script will scan the project's **`.claude/docs` directory** and display:
      - Library names and versions
      - Number of pages cached
@@ -55,8 +55,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The `--path` parameter tells it which project to operate on (current directory)
+- The script automatically detects the project directory from where the command is run
 - The list command is fast (reads index files only, doesn't scan page content)
-- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in the project)
+- The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
 - Use `--project` to see which of your project's dependencies have cached documentation
 - Use `--verbose` for complete details including source URLs and local paths

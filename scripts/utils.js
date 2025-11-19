@@ -8,11 +8,10 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Get the cache directory path
- * Defaults to ~/.claude/docs or uses config setting
+ * Defaults to .claude/docs in the current project directory
  */
 export function getCacheDir() {
-  const homeDir = os.homedir();
-  return path.join(homeDir, '.claude', 'docs');
+  return path.join(process.cwd(), '.claude', 'docs');
 }
 
 /**
@@ -31,13 +30,31 @@ export function getPluginDir() {
 
 /**
  * Load configuration from doc-fetcher-config.json
+ * Tries project config first, then falls back to plugin config
  */
 export async function loadConfig() {
-  const configPath = path.join(getPluginDir(), 'doc-fetcher-config.json');
+  // Try project config first, then plugin config
+  const projectConfigPath = path.join(process.cwd(), 'doc-fetcher-config.json');
+  const pluginConfigPath = path.join(getPluginDir(), 'doc-fetcher-config.json');
+
+  let configPath = pluginConfigPath;
+  try {
+    await fs.access(projectConfigPath);
+    configPath = projectConfigPath;
+  } catch {
+    // Use plugin config as fallback
+  }
 
   try {
     const data = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(data);
+    const config = JSON.parse(data);
+
+    // Resolve relative cache_directory paths relative to project root
+    if (config.cache_directory && !path.isAbsolute(config.cache_directory)) {
+      config.cache_directory = path.join(process.cwd(), config.cache_directory);
+    }
+
+    return config;
   } catch (error) {
     // Return default config if file doesn't exist
     return {
@@ -58,7 +75,10 @@ export async function loadConfig() {
       user_agent: 'Claude Code Doc Fetcher/1.0',
       respect_robots_txt: true,
       max_retries: 3,
-      timeout_ms: 30000
+      timeout_ms: 30000,
+      enable_checkpoints: true,
+      checkpoint_interval: 10,
+      checkpoint_max_age_days: 7
     };
   }
 }

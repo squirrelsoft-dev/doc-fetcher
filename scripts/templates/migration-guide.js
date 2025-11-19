@@ -18,10 +18,11 @@ import fs from 'fs/promises';
  * Find available versions for comparison
  * @param {string} library - Library name
  * @param {string} currentVersion - Current version
+ * @param {string} cacheDir - Cache directory path
  * @returns {Promise<Array>} Available previous versions
  */
-async function findPreviousVersions(library, currentVersion) {
-  const docsBaseDir = path.join(process.cwd(), '.claude/docs', library);
+async function findPreviousVersions(library, currentVersion, cacheDir) {
+  const docsBaseDir = path.join(cacheDir, library);
 
   try {
     const versions = await fs.readdir(docsBaseDir);
@@ -103,13 +104,13 @@ function compareVersions(currentAnalysis, previousAnalysis) {
  * @returns {string} Complete skill content
  */
 export async function generateMigrationGuideTemplate(params) {
-  const { library, version, docsPath, analysis, activationPatterns, previousAnalysis = null, previousVersion = null } = params;
+  const { library, version, docsPath, cacheDir, analysis, activationPatterns, previousAnalysis = null, previousVersion = null } = params;
 
   const skillName = generateSkillName(library, version, 'migration-guide');
   const description = `Migration guide for upgrading to ${library} v${version}`;
 
   // Find previous versions if not provided
-  const previousVersions = await findPreviousVersions(library, version);
+  const previousVersions = await findPreviousVersions(library, version, cacheDir);
   const fromVersion = previousVersion || previousVersions[0] || 'previous version';
 
   // Compare versions if we have previous analysis

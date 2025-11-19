@@ -24,8 +24,8 @@ When the user invokes this command, follow these steps:
    - If library is missing: prompt for the library name
 
 2. **Run Generate Skill Command**:
-   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/generate-skill.js $ARGUMENTS --path "$(pwd)"`
-   - The `--path` argument tells the script to operate on the **current project directory**
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/generate-skill.js $ARGUMENTS`
+   - The script automatically operates on the **current project directory** (`process.cwd()`)
    - The script will:
      - Locate cached docs in the project's **`.claude/docs/[library]/[version]/`** directory
      - Analyze the documentation structure and content
@@ -55,7 +55,7 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The `--path` parameter tells it which project to operate on (current directory)
+- The script automatically detects the project directory from where the command is run
 - Skills are generated from documentation cached in the project's `.claude/docs` directory
 - The generated skill references the specific version of documentation
 - Skills can auto-activate based on package.json dependencies or file patterns

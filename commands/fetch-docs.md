@@ -23,8 +23,8 @@ When the user invokes this command, follow these steps:
    - If library is missing: prompt for the library name
 
 2. **Run Fetch Command**:
-   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/fetch-docs.js $ARGUMENTS --path "$(pwd)"`
-   - The `--path` argument tells the script to operate on the **current project directory**
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/fetch-docs.js $ARGUMENTS`
+   - The script automatically operates on the **current project directory** (`process.cwd()`)
    - The script will:
      - Discover documentation format (llms.txt, claude.txt, or sitemap.xml)
      - Detect the documentation framework (Docusaurus, VitePress, Nextra, etc.)
@@ -54,8 +54,8 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The `--path` parameter tells it which project to operate on (current directory)
-- The cache directory is configured in `doc-fetcher-config.json` (defaults to `.claude/docs` in the project)
+- The script automatically detects the project directory from where the command is run
+- The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
 - Fetching can take several minutes for large documentation sets
 - Use specific versions (e.g., `/fetch-docs nextjs 15.0.0`) to match your project's package.json
 - The fetched docs are stored locally and won't be updated automatically (use `/update-docs` for that)

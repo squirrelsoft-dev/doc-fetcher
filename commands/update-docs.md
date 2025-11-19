@@ -21,9 +21,9 @@ When the user invokes this command, follow these steps:
    - Valid flags: `--all` (update all cached docs), `--project` (update project dependencies), `--force` (force re-fetch)
 
 2. **Run Update Command**:
-   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/update-docs.js $ARGUMENTS --path "$(pwd)"`
-   - The `--path` argument tells the script to operate on the **current project directory**
-   - The script will check the project's `.claude/docs` directory for cached documentation
+   - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/update-docs.js $ARGUMENTS`
+   - The script automatically operates on the **current project directory** (`process.cwd()`)
+   - It will check the project's `.claude/docs` directory for cached documentation
    - Wait for completion and capture the output
 
 3. **Handle Results**:
@@ -42,7 +42,7 @@ When the user invokes this command, follow these steps:
 ## Important Notes
 
 - The script runs from the plugin directory: `~/.claude/plugins/cache/doc-fetcher/`
-- The `--path` parameter tells it which project to operate on (current directory)
+- The script automatically detects the project directory from where the command is run
 - The cache directory is configured in `doc-fetcher-config.json` and defaults to `.claude/docs` in the project
 - Updates check for newer versions and re-fetch if available
 - Use `--force` to re-fetch even if recently updated

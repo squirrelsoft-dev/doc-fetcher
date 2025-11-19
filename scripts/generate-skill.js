@@ -33,7 +33,7 @@ const program = new Command();
 /**
  * Generate skill content using analysis and templates
  */
-async function generateSkillContent(library, metadata, docsPath, template = 'expert') {
+async function generateSkillContent(library, metadata, docsPath, cacheDir, template = 'expert') {
   log('[1/3] Analyzing documentation...', 'info');
 
   // Run comprehensive analysis
@@ -59,7 +59,8 @@ async function generateSkillContent(library, metadata, docsPath, template = 'exp
   const templateParams = {
     library,
     version: metadata.version,
-    docsPath: `.claude/docs/${library}/${metadata.version}`,
+    docsPath: path.relative(process.cwd(), docsPath),
+    cacheDir,
     analysis,
     activationPatterns
   };
@@ -181,6 +182,7 @@ async function generateSkill(library, version, options) {
     library,
     metadata,
     libraryPath,
+    cacheDir,
     template
   );
 
