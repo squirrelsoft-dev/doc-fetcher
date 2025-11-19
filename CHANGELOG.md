@@ -16,6 +16,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-update scheduler
 - Playwright integration for JavaScript-heavy sites
 
+## [1.2.0] - 2025-01-18
+
+### Added
+- **Testing Infrastructure** 🎉
+  - Jest testing framework with ES module support
+  - 86 unit tests covering core functionality
+  - Test coverage reporting with configurable thresholds
+  - Test fixtures for common scenarios
+  - Comprehensive test documentation (tests/README.md)
+- **Test Coverage**
+  - utils.js: ~53% coverage (formatting, URL helpers, file operations)
+  - robots-checker.js: ~16% coverage (constructor, configuration modes)
+  - Dependency detection: Full coverage of parsing logic
+- **NPM Scripts**
+  - `npm test` - Run all tests
+  - `npm run test:watch` - Watch mode for development
+  - `npm run test:coverage` - Coverage reports
+
+### Changed
+- Updated package.json with Jest configuration for ES modules
+- Added @jest/globals and jest as devDependencies
+- Set initial coverage thresholds (10% statements, 20% functions)
+
+### Documentation
+- Added tests/README.md with testing guidelines
+- Documented test structure and organization
+- Added examples for writing new tests
+- Outlined future test expansion plans
+
+## [1.1.0] - 2025-01-18
+
+### Added
+- **Robots.txt Compliance** ✅
+  - RobotsChecker class with caching (24-hour TTL)
+  - Respects Disallow directives (skip blocked URLs)
+  - Honors Crawl-delay for dynamic rate limiting
+  - Discovers sitemap URLs from robots.txt
+  - Three modes: true (skip), false (disabled), strict (error)
+  - Graceful degradation on failures
+  - Integrated into all HTTP-fetching scripts
+
+### Changed
+- Updated fetch-docs.js to check robots.txt before crawling
+- Updated parse-sitemap.js to respect robots.txt rules
+- Updated find-llms-txt.js to use robots.txt compliance
+- Added robots-parser dependency to package.json
+
+### Fixed
+- Ethical crawling compliance
+- Prevention of IP bans from aggressive crawling
+- Professional credibility with documentation providers
+
 ## [1.0.0] - 2025-01-17
 
 ### Added
