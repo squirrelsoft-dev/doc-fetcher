@@ -98,8 +98,10 @@ const CONTENT_SELECTORS = {
 
 /**
  * Detect documentation framework from HTML
+ * @param {string} html - HTML content
+ * @returns {string} Framework name (docusaurus, vitepress, nextra, gitbook, mintlify, readthedocs, generic)
  */
-function detectFramework(html) {
+export function detectFramework(html) {
   const $ = cheerio.load(html);
 
   // Check meta tags

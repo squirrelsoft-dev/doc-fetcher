@@ -47,6 +47,9 @@ import {
   createInitialCheckpoint,
   formatCheckpointInfo
 } from './checkpoint-manager.js';
+import { resolveDocsUrl, detectEcosystem, ECOSYSTEMS } from './resolve-docs-url.js';
+import { crawlLinks } from './crawl-links.js';
+import { fetchGitHubReadme, formatReadmeAsDoc } from './github-readme.js';
 
 const program = new Command();
 
@@ -422,7 +425,29 @@ async function fetchDocumentation(library, version, options) {
   }
 
   // Determine documentation URL
-  const docUrl = options.url || resumeCheckpoint?.metadata?.sourceUrl || `https://${library}.dev/docs`;
+  let docUrl = options.url || resumeCheckpoint?.metadata?.sourceUrl;
+
+  // If no URL provided, use the resolver to find documentation
+  if (!docUrl) {
+    log('\\n[0/7] Resolving documentation URL...', 'info');
+    const resolved = await resolveDocsUrl(library, {
+      ecosystem: options.ecosystem,
+      validate: true
+    });
+
+    if (resolved.success) {
+      docUrl = resolved.url;
+      log(`   Resolved from: ${resolved.source}`, 'info');
+    } else {
+      // Fall back to old behavior as last resort
+      docUrl = `https://${library}.dev/docs`;
+      log(`   ⚠ Could not resolve URL, using fallback: ${docUrl}`, 'warn');
+      if (resolved.suggestions) {
+        resolved.suggestions.forEach(s => log(`   → ${s}`, 'info'));
+      }
+    }
+  }
+
   log(`Documentation URL: ${docUrl}`, 'info');
 
   // 0. Initialize robots.txt checker
@@ -554,9 +579,87 @@ async function fetchDocumentation(library, version, options) {
       if (crawlResults.failed > 0) {
         log(`✗ Failed to crawl ${crawlResults.failed} pages`, 'warn');
       }
-    } catch (error) {
-      log(`✗ Failed to parse sitemap: ${error.message}`, 'error');
-      throw new Error('Could not fetch documentation. Please check the URL or provide a custom --url');
+    } catch (sitemapError) {
+      log(`✗ Sitemap not found: ${sitemapError.message}`, 'warn');
+
+      // Fallback 1: Try link crawling
+      log('\\n[3b/7] Trying link crawling fallback...', 'info');
+      const linkResult = await crawlLinks(docUrl, config, robotsChecker);
+
+      if (linkResult.success && linkResult.urls.length > 0) {
+        log(`✓ Found ${linkResult.urls.length} pages via ${linkResult.framework} navigation`, 'info');
+        sourceType = 'link-crawl';
+        sourceUrl = docUrl;
+
+        // Create checkpoint for link crawl
+        if (enableCheckpoint && !resumeCheckpoint) {
+          await ensureDir(libraryPath);
+          await createInitialCheckpoint(libraryPath, {
+            operation: 'fetch',
+            library,
+            version: version || 'latest',
+            totalPages: linkResult.urls.length,
+            urls: linkResult.urls,
+            sourceUrl: docUrl,
+            sourceType: 'link-crawl',
+            framework: linkResult.framework
+          });
+          resumeCheckpoint = await loadCheckpoint(libraryPath);
+        }
+
+        // Crawl discovered pages
+        log('\\n[4/7] Crawling discovered pages...', 'info');
+        const crawlResults = await crawlPages(linkResult.urls, libraryPath, config, robotsChecker, {
+          enableCheckpoint,
+          checkpointData: resumeCheckpoint
+        });
+
+        pages = crawlResults.pages;
+
+        log(`\\n✓ Crawled ${crawlResults.successful} pages`, 'info');
+        if (crawlResults.failed > 0) {
+          log(`✗ Failed to crawl ${crawlResults.failed} pages`, 'warn');
+        }
+      } else {
+        // Fallback 2: Try GitHub README
+        log('\\n[3c/7] Trying GitHub README fallback...', 'info');
+
+        // Get registry data to find GitHub repo
+        const resolved = await resolveDocsUrl(library, { ecosystem: options.ecosystem });
+        const github = resolved.registry?.github;
+
+        if (github) {
+          const readmeResult = await fetchGitHubReadme(github);
+
+          if (readmeResult.success) {
+            log(`✓ Using GitHub README as documentation`, 'info');
+            sourceType = 'github-readme';
+            sourceUrl = readmeResult.metadata.url;
+
+            // Format README with metadata
+            const formattedContent = formatReadmeAsDoc(readmeResult, library);
+
+            // Ensure directory exists
+            await ensureDir(libraryPath);
+            await ensureDir(path.join(libraryPath, 'pages'));
+
+            // Save README as single page
+            const readmePath = path.join(libraryPath, 'pages', 'README.md');
+            await fs.writeFile(readmePath, formattedContent, 'utf-8');
+
+            pages = [{
+              url: readmeResult.metadata.url,
+              title: `${library} - GitHub README`,
+              filename: 'README.md',
+              size: formattedContent.length
+            }];
+          } else {
+            throw new Error(`Could not fetch documentation from any source. ${readmeResult.error || ''}`);
+          }
+        } else {
+          throw new Error('Could not fetch documentation. No sitemap, navigation links, or GitHub README available.');
+        }
+      }
     }
   }
 
@@ -759,6 +862,7 @@ program
   .argument('<library>', 'Library name (e.g., nextjs, react)')
   .argument('[version]', 'Specific version to fetch')
   .option('-u, --url <url>', 'Custom documentation URL')
+  .option('-e, --ecosystem <ecosystem>', 'Package ecosystem (npm, crates.io, pypi)')
   .option('--no-skill', 'Skip automatic skill generation')
   .action(async (library, version, options) => {
     try {
