@@ -83,46 +83,46 @@ ln -s $(pwd) ~/.claude/plugins/doc-fetcher
 
 ```bash
 # Fetch latest Next.js documentation
-/fetch-docs nextjs
+/doc-fetcher:fetch-docs nextjs
 
 # Fetch specific version
-/fetch-docs nextjs 15.0.3
+/doc-fetcher:fetch-docs nextjs 15.0.3
 
 # Fetch from custom URL
-/fetch-docs my-lib --url https://docs.mylib.com
+/doc-fetcher:fetch-docs my-lib --url https://docs.mylib.com
 ```
 
 ### 2. List Cached Documentation
 
 ```bash
 # List all cached docs
-/list-docs
+/doc-fetcher:list-docs
 
 # List docs for current project
-/list-docs --project
+/doc-fetcher:list-docs --project
 ```
 
 ### 3. Update Documentation
 
 ```bash
 # Update specific library
-/update-docs nextjs
+/doc-fetcher:update-docs nextjs
 
 # Update all cached docs
-/update-docs --all
+/doc-fetcher:update-docs --all
 
 # Update docs matching package.json
-/update-docs --project
+/doc-fetcher:update-docs --project
 ```
 
 ### 4. Generate Skills
 
 ```bash
 # Generate expert skill from cached docs
-/generate-doc-skill nextjs
+/doc-fetcher:generate-skill nextjs
 
 # Use specific template
-/generate-doc-skill nextjs --template quick-reference
+/doc-fetcher:generate-skill nextjs --template quick-reference
 ```
 
 ## Usage Examples
@@ -133,12 +133,12 @@ ln -s $(pwd) ~/.claude/plugins/doc-fetcher
 # Starting a new Next.js + Supabase project
 
 # Fetch documentation for your stack
-/fetch-docs nextjs 15.0.3
-/fetch-docs react 18.2.0
-/fetch-docs supabase 2.39.0
+/doc-fetcher:fetch-docs nextjs 15.0.3
+/doc-fetcher:fetch-docs react 18.2.0
+/doc-fetcher:fetch-docs supabase 2.39.0
 
 # Or automatically detect and fetch from package.json
-/fetch-docs --project
+/doc-fetcher:fetch-docs --project
 
 # Claude now has accurate context for your entire stack
 ```
@@ -149,10 +149,10 @@ ln -s $(pwd) ~/.claude/plugins/doc-fetcher
 # Upgrading Next.js from 14 to 15
 
 # Fetch new version docs
-/fetch-docs nextjs 15.0.0
+/doc-fetcher:fetch-docs nextjs 15.0.0
 
 # Generate migration guide skill
-/generate-doc-skill nextjs --template migration-guide
+/doc-fetcher:generate-skill nextjs --template migration-guide
 
 # Ask Claude: "What are the breaking changes in Next.js 15?"
 ```
@@ -163,15 +163,15 @@ ln -s $(pwd) ~/.claude/plugins/doc-fetcher
 # Keep documentation current
 
 # Check what needs updating
-/list-docs --project
+/doc-fetcher:list-docs --project
 
 # Update all project docs
-/update-docs --project
+/doc-fetcher:update-docs --project
 ```
 
 ## Commands
 
-### `/fetch-docs <library> [version] [options]`
+### `/doc-fetcher:fetch-docs <library> [version] [options]`
 
 Fetch and cache documentation for a library.
 
@@ -181,12 +181,12 @@ Fetch and cache documentation for a library.
 
 **Examples:**
 ```bash
-/fetch-docs nextjs
-/fetch-docs nextjs 15.0.3
-/fetch-docs my-internal-lib --url https://docs.company.com
+/doc-fetcher:fetch-docs nextjs
+/doc-fetcher:fetch-docs nextjs 15.0.3
+/doc-fetcher:fetch-docs my-internal-lib --url https://docs.company.com
 ```
 
-### `/update-docs [library] [options]`
+### `/doc-fetcher:update-docs [library] [options]`
 
 Update cached documentation to latest version.
 
@@ -204,16 +204,16 @@ Update cached documentation to latest version.
 **Examples:**
 ```bash
 # Incremental update (only fetches changed pages)
-/update-docs nextjs
+/doc-fetcher:update-docs nextjs
 
 # Update all cached libraries incrementally
-/update-docs --all
+/doc-fetcher:update-docs --all
 
 # Update project dependencies incrementally
-/update-docs --project
+/doc-fetcher:update-docs --project
 
 # Force full re-fetch (bypass incremental logic)
-/update-docs nextjs --force
+/doc-fetcher:update-docs nextjs --force
 ```
 
 **Incremental Update Output:**
@@ -239,7 +239,7 @@ Will fetch 12 pages (saving 95% bandwidth)
 ✓ nextjs updated successfully
 ```
 
-### `/list-docs [options]`
+### `/doc-fetcher:list-docs [options]`
 
 List cached documentation with metadata.
 
@@ -251,12 +251,12 @@ List cached documentation with metadata.
 
 **Examples:**
 ```bash
-/list-docs
-/list-docs --project
-/list-docs --verbose
+/doc-fetcher:list-docs
+/doc-fetcher:list-docs --project
+/doc-fetcher:list-docs --verbose
 ```
 
-### `/generate-doc-skill <library> [options]`
+### `/doc-fetcher:generate-skill <library> [options]`
 
 Generate a Claude Code skill from cached documentation.
 
@@ -266,9 +266,9 @@ Generate a Claude Code skill from cached documentation.
 
 **Examples:**
 ```bash
-/generate-doc-skill nextjs
-/generate-doc-skill nextjs --template quick-reference
-/generate-doc-skill supabase --template best-practices
+/doc-fetcher:generate-skill nextjs
+/doc-fetcher:generate-skill nextjs --template quick-reference
+/doc-fetcher:generate-skill supabase --template best-practices
 ```
 
 ## Input Validation
@@ -408,7 +408,7 @@ Generated skills use intelligent content analysis to provide context-aware assis
 
 **Example:**
 ```bash
-/generate-doc-skill nextjs --template expert
+/doc-fetcher:generate-skill nextjs --template expert
 ```
 
 ### Quick Reference Template (`quick-reference`)
@@ -423,7 +423,7 @@ Generated skills use intelligent content analysis to provide context-aware assis
 
 **Example:**
 ```bash
-/generate-doc-skill react --template quick-reference
+/doc-fetcher:generate-skill react --template quick-reference
 ```
 
 ### Migration Guide Template (`migration-guide`)
@@ -440,11 +440,11 @@ Generated skills use intelligent content analysis to provide context-aware assis
 **Example:**
 ```bash
 # Fetch both versions first
-/fetch-docs nextjs 14.0.0
-/fetch-docs nextjs 15.0.0
+/doc-fetcher:fetch-docs nextjs 14.0.0
+/doc-fetcher:fetch-docs nextjs 15.0.0
 
 # Generate migration guide
-/generate-doc-skill nextjs --template migration-guide
+/doc-fetcher:generate-skill nextjs --template migration-guide
 ```
 
 ### Troubleshooter Template (`troubleshooter`)
@@ -460,7 +460,7 @@ Generated skills use intelligent content analysis to provide context-aware assis
 
 **Example:**
 ```bash
-/generate-doc-skill supabase --template troubleshooter
+/doc-fetcher:generate-skill supabase --template troubleshooter
 ```
 
 ### Best Practices Template (`best-practices`)
@@ -477,7 +477,7 @@ Generated skills use intelligent content analysis to provide context-aware assis
 
 **Example:**
 ```bash
-/generate-doc-skill typescript --template best-practices
+/doc-fetcher:generate-skill typescript --template best-practices
 ```
 
 ### Content Analysis
@@ -549,7 +549,7 @@ Documentation is stored locally in `.claude/docs/`:
 ### 1. Documentation Fetching Flow
 
 ```
-User: /fetch-docs nextjs
+User: /doc-fetcher:fetch-docs nextjs
 
 1. llms-txt-finder skill
    ↓ Checks for AI-optimized docs
@@ -593,8 +593,8 @@ User opens project with package.json
    ⚠ supabase@2.39.0 - Cached 2.38.0 (outdated)
 
 3. Suggest actions
-   → /fetch-docs react 18.2.0
-   → /update-docs supabase
+   → /doc-fetcher:fetch-docs react 18.2.0
+   → /doc-fetcher:update-docs supabase
 
 4. User runs suggestions
    ✓ All project dependencies documented
@@ -609,7 +609,7 @@ User opens project with package.json
 
 **Solution:**
 ```bash
-/fetch-docs nextjs 15.0.3
+/doc-fetcher:fetch-docs nextjs 15.0.3
 # Claude now references Next.js 15 docs exclusively
 ```
 
@@ -621,7 +621,7 @@ User opens project with package.json
 
 **Solution:**
 ```bash
-/fetch-docs acme-ui --url https://docs.acme.com/ui
+/doc-fetcher:fetch-docs acme-ui --url https://docs.acme.com/ui
 # Claude can now assist with proprietary systems
 ```
 
@@ -634,7 +634,7 @@ User opens project with package.json
 **Solution:**
 ```bash
 # Before trip: fetch all docs
-/fetch-docs --project
+/doc-fetcher:fetch-docs --project
 ```
 
 **Result:** Full documentation access offline
@@ -646,7 +646,7 @@ User opens project with package.json
 **Solution:**
 ```bash
 # Share cached docs or use remote sync
-/fetch-docs nextjs --sync
+/doc-fetcher:fetch-docs nextjs --sync
 # All team members use same documentation version
 ```
 
@@ -674,7 +674,7 @@ User opens project with package.json
 ## Roadmap
 
 ### Phase 1 (MVP) ✅
-- [x] `/fetch-docs` command with basic crawling
+- [x] `/doc-fetcher:fetch-docs` command with basic crawling
 - [x] llms.txt detection
 - [x] Sitemap.xml parsing
 - [x] Local storage
@@ -683,7 +683,7 @@ User opens project with package.json
 ### Phase 2 (Current)
 - [ ] Framework-specific crawlers (Docusaurus, VitePress)
 - [ ] Dependency detection
-- [ ] `/update-docs` command
+- [ ] `/doc-fetcher:update-docs` command
 - [ ] Improved content extraction
 
 ### Phase 3 (Future)
@@ -703,7 +703,7 @@ User opens project with package.json
 **Solution:**
 ```bash
 # Provide explicit URL
-/fetch-docs my-lib --url https://docs.example.com
+/doc-fetcher:fetch-docs my-lib --url https://docs.example.com
 ```
 
 ### "Crawl failed: Rate limited"
@@ -732,8 +732,8 @@ User opens project with package.json
 
 **Solution:**
 ```bash
-/update-docs <library>
-/generate-doc-skill <library>
+/doc-fetcher:update-docs <library>
+/doc-fetcher:generate-skill <library>
 ```
 
 ## Contributing
