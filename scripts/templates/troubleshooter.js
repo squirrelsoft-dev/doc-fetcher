@@ -8,7 +8,9 @@ import {
   generateFrontmatter,
   generateSkillName,
   formatCodeExample,
-  pluralize
+  pluralize,
+  formatCompactDocIndex,
+  formatFeaturedCodeExamples
 } from './template-base.js';
 
 /**
@@ -57,10 +59,11 @@ function extractTroubleshootingContent(analysis) {
  * @param {string} params.docsPath - Path to cached docs
  * @param {Object} params.analysis - Analysis results
  * @param {Array} params.activationPatterns - Activation patterns
+ * @param {Array} params.sitemap - Sitemap pages array
  * @returns {string} Complete skill content
  */
 export function generateTroubleshooterTemplate(params) {
-  const { library, version, docsPath, analysis, activationPatterns } = params;
+  const { library, version, docsPath, analysis, activationPatterns, sitemap = [] } = params;
 
   const skillName = generateSkillName(library, version, 'troubleshooter');
   const description = `Troubleshooting and debugging assistant for ${library} v${version}`;
@@ -88,10 +91,47 @@ export function generateTroubleshooterTemplate(params) {
     autoActivate: true
   });
 
+  // Filter sitemap for troubleshooting-related pages
+  const troubleshootingPages = sitemap.filter(page =>
+    page.title?.toLowerCase().includes('error') ||
+    page.title?.toLowerCase().includes('debug') ||
+    page.title?.toLowerCase().includes('troubleshoot') ||
+    page.url?.toLowerCase().includes('error') ||
+    page.url?.toLowerCase().includes('debug')
+  );
+
+  // Get troubleshooting code examples
+  const troubleshootingExamples = (analysis.codeExamples?.examples || [])
+    .filter(ex => ex.category === 'Troubleshooting' || ex.title?.toLowerCase().includes('error') || ex.title?.toLowerCase().includes('fix'));
+
   const content = `
 # ${library} Troubleshooter
 
 I specialize in helping you debug and resolve issues with ${library} version ${version}. I can help diagnose problems, explain error messages, and suggest solutions.
+
+**IMPORTANT**: When I need detailed information about a specific topic, I should read the cached documentation files directly from \`${docsPath}/pages/\`.
+
+## How to Use This Skill
+
+When troubleshooting ${library} issues:
+
+1. **Check the Documentation Index** below to find error/debugging doc files
+2. **Read the cached file** using the Read tool: \`${docsPath}/pages/[filename]\`
+3. **Provide accurate troubleshooting guidance** based on the documentation
+
+## Troubleshooting Documentation Reference
+
+${troubleshootingPages.length > 0 ? formatCompactDocIndex(troubleshootingPages, docsPath, 20) : 'No specific troubleshooting pages found. See full documentation index below.'}
+
+## Full Documentation Reference
+
+${formatCompactDocIndex(sitemap, docsPath, 30)}
+
+${troubleshootingExamples.length > 0 ? `
+## Troubleshooting Code Examples
+
+${formatFeaturedCodeExamples(troubleshootingExamples, 5)}
+` : ''}
 
 ## 🔍 What I Can Help With
 

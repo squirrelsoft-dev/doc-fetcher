@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-2.6.5-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -56,72 +56,49 @@ Doc Fetcher uses a **global cache architecture** - documentation and skills are 
 
 ## Recent Updates
 
-### v1.6.0 (2025-01-18)
+### v2.6.5 (2025-11-22)
 
 #### Added
-- **Enhanced Error Recovery** - Robust error handling with automatic recovery
-  - **Checkpoint/Resume System**: Auto-saves progress every 10 pages, resume from interruptions
-  - **Intelligent Error Categorization**: Distinguishes rate limits (429), retryable (5xx, network), and permanent errors (404, 403)
-  - **Adaptive Backoff**: Exponential backoff with jitter (1s → 30s max), respects `Retry-After` headers
-  - **Automatic Interruption Detection**: Detects partial fetches and offers to resume on next run
-  - **Detailed Error Reporting**: Error summaries by category with suggested actions
-  - **Rate Limit Handling**: Graceful 429 response handling prevents IP bans
-  - **Configuration Options**: `enable_checkpoints`, `checkpoint_interval`, `checkpoint_max_age_days`
-  - **75 New Tests**: Comprehensive unit tests for error-utils (48) and checkpoint-manager (27)
-  - **Total: 274 tests** (all passing)
+- **Recursive BFS Crawling** - Comprehensive page discovery for documentation sites
+  - Replaces limited second-level crawl with full recursive breadth-first search
+  - Discovers all pages under the docs path prefix automatically
+  - Configurable max depth and max links limits
+  - Progress reporting during crawl
 
-#### Impact
-- **Data Loss Prevention**: Never lose progress on interrupted crawls (500+ pages)
-- **Better Reliability**: Automatic recovery from network failures and timeouts
-- **Professional Crawling**: Proper rate limit handling with server-specified retry delays
+- **SquirrelSoft API Integration** - Centralized documentation URL resolution
+  - Queries SquirrelSoft API first for known documentation URLs
+  - Falls back to package registry resolution (npm, PyPI, crates.io)
+  - Reports successful crawls back to improve future resolutions
+  - Includes bonus metadata (llms.txt URLs, sitemap URLs)
 
-### v1.5.0 (2025-01-18)
+- **Raw Markdown Support** - Direct handling of non-HTML documentation
+  - Detects markdown files (`.md`, `.txt`) and plain text content
+  - Skips HTML extraction for raw markdown responses
+  - Extracts titles from markdown headings
 
-#### Added
-- **Incremental Updates** - Massive performance improvement for documentation updates
-  - Only fetches changed/new pages instead of re-downloading all documentation
-  - Compares sitemaps using `lastmod` timestamps to detect changes
-  - Typically saves 95%+ bandwidth and is 10-100x faster
-  - Automatic fallback to full fetch if incremental not possible
-  - `--force` flag to bypass incremental logic when needed
-  - New `compare-sitemaps.js` module with comprehensive change detection
-  - Enhanced sitemap storage with metadata (lastmod, changefreq, priority)
-  - Update statistics tracking in metadata (pages_checked, pages_unchanged, pages_modified, etc.)
-  - 16 new unit tests for sitemap comparison (199 total tests, all passing)
+- **Enhanced Error Tracking** - Detailed crawl failure logging
+  - New `crawl-errors.json` file with categorized failures
+  - Error categories: EXTRACTION, SAVE_ERROR added
+  - Suggested actions for each error type
+  - Error summary by category
 
-### v1.3.0 (2025-01-18)
+- **Generate All Templates** - Create all skill templates at once
+  - Default behavior now generates all 5 templates (expert, quick-reference, migration-guide, troubleshooter, best-practices)
+  - Use `--template <name>` for single template generation
+  - Shared analysis across templates for efficiency
 
-#### Added
-- **Comprehensive Input Validation** - Prevents common errors and security issues
-  - Validates library names (with scoped package support)
-  - Validates version strings (semantic versioning + special keywords)
-  - Validates URLs (blocks localhost/private IPs by default)
-  - Validates file paths (with existence and type checking)
-  - Validates template names (must be one of 5 allowed templates)
-  - Contextual error messages with field name, value, and suggestions
-  - Security features: path traversal prevention, null byte detection
-  - 72 comprehensive unit tests with 100% pass rate
+- **llms.txt Validation** - Better detection of soft 404 pages
+  - Uses GET instead of HEAD to validate content
+  - Checks for HTML content masquerading as text
+  - Validates minimum content length
 
-### v1.1.0 (2025-01-18)
+#### Changed
+- `/generate-skill` command now reminds users to **restart Claude Code** to load new skills
+- Sitemap now included in skill templates for documentation index
 
-#### Added
-- **Robots.txt Compliance** - Ethical crawling that respects webmaster preferences
-  - Automatically checks robots.txt before crawling any documentation site
-  - Respects `Disallow` directives (skips blocked URLs)
-  - Honors `Crawl-delay` for dynamic rate limiting
-  - Discovers sitemap URLs from robots.txt
-  - Caches robots.txt with 24-hour TTL for performance
-  - Three compliance modes: `true` (skip blocked, default), `false` (disabled), `strict` (error on violation)
-  - Graceful degradation when robots.txt unavailable
+### v2.0.0 - v2.6.0
 
-#### Fixed
-- **Doc-Crawler Agent Behavior** - Fixed agent to use existing scripts instead of creating custom code
-  - Agent now runs `node scripts/fetch-docs.js` instead of generating custom `crawler.js` files
-  - Added `type: agent` to frontmatter (was missing, causing ambiguous behavior)
-  - Rewrote instructions from tutorial-style (617 lines) to operational directives (335 lines)
-  - Removed file creation permissions to prevent custom code generation
-  - Added clear prohibitions against writing crawling logic
-  - Agent now leverages all existing infrastructure including robots.txt compliance
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 ## Installation
 

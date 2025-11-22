@@ -9,7 +9,9 @@ import {
   generateSkillName,
   formatCodeExample,
   formatKeywords,
-  pluralize
+  pluralize,
+  formatCompactDocIndex,
+  formatFeaturedCodeExamples
 } from './template-base.js';
 
 /**
@@ -68,10 +70,11 @@ function extractBestPracticesContent(analysis) {
  * @param {string} params.docsPath - Path to cached docs
  * @param {Object} params.analysis - Analysis results
  * @param {Array} params.activationPatterns - Activation patterns
+ * @param {Array} params.sitemap - Sitemap pages array
  * @returns {string} Complete skill content
  */
 export function generateBestPracticesTemplate(params) {
-  const { library, version, docsPath, analysis, activationPatterns } = params;
+  const { library, version, docsPath, analysis, activationPatterns, sitemap = [] } = params;
 
   const skillName = generateSkillName(library, version, 'best-practices');
   const description = `Best practices and recommended patterns for ${library} v${version}`;
@@ -98,10 +101,34 @@ export function generateBestPracticesTemplate(params) {
     autoActivate: true
   });
 
+  // Get best practice code examples
+  const bestPracticeExamples = (analysis.codeExamples?.examples || [])
+    .filter(ex => ex.category === 'Usage Example' || ex.category === 'Configuration');
+
   const content = `
 # ${library} Best Practices
 
 I help you write high-quality ${library} code following recommended patterns, performance optimizations, and security guidelines for version ${version}.
+
+**IMPORTANT**: When I need detailed information about a specific topic, I should read the cached documentation files directly from \`${docsPath}/pages/\`.
+
+## How to Use This Skill
+
+When answering best practices questions about ${library}:
+
+1. **Check the Documentation Index** below to find relevant doc files
+2. **Read the cached file** using the Read tool: \`${docsPath}/pages/[filename]\`
+3. **Provide accurate best practices guidance** based on the documentation
+
+## Documentation Reference
+
+${formatCompactDocIndex(sitemap, docsPath, 40)}
+
+## Featured Code Examples
+
+These examples demonstrate recommended patterns:
+
+${formatFeaturedCodeExamples(bestPracticeExamples, 8)}
 
 ## 🎯 Purpose
 

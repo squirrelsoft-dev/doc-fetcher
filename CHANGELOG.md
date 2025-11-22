@@ -14,7 +14,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embeddings for semantic search within docs
 - Auto-update scheduler
 
-## [1.6.0] - 2025-01-18
+## [2.6.5] - 2025-11-22
+
+### Added
+
+- **Recursive BFS Crawling** 🔍
+  - Replaces limited second-level crawl with full recursive breadth-first search
+  - Discovers all pages under the docs path prefix automatically
+  - Configurable max depth (default: 10) and max links (default: 200) limits
+  - Progress reporting during crawl (every 10 pages)
+  - Path prefix filtering to stay within documentation section
+
+- **SquirrelSoft API Integration** 🌐
+  - New `scripts/registries/squirrelsoft.js` module
+  - Queries SquirrelSoft API first for known documentation URLs
+  - Falls back to package registry resolution (npm, PyPI, crates.io)
+  - Reports successful crawls back to improve future resolutions
+  - Returns bonus metadata: llms.txt URLs, sitemap URLs
+
+- **Raw Markdown Support** 📝
+  - Detects markdown files (`.md`, `.txt`) and plain text content
+  - Skips HTML extraction for raw markdown responses
+  - Content-Type header detection (`text/markdown`, `text/plain`)
+  - URL extension detection for `.md` and `.markdown` files
+  - Extracts titles from markdown headings (`# Title`)
+
+- **Enhanced Error Tracking** ❌
+  - New `crawl-errors.json` file with categorized failures
+  - New error categories: `EXTRACTION`, `SAVE_ERROR`
+  - Error summary by category in error-utils.js
+  - Suggested actions for each error type
+  - Failed pages logged with full error context
+
+- **Generate All Templates by Default** 🎯
+  - Default behavior now generates all 5 templates (expert, quick-reference, migration-guide, troubleshooter, best-practices)
+  - Use `--template <name>` for single template generation
+  - Shared analysis across templates for efficiency
+  - Results array returned when generating multiple templates
+
+- **llms.txt Validation Improvements** ✅
+  - Uses GET instead of HEAD to validate content
+  - Checks for HTML content masquerading as text (soft 404 detection)
+  - Validates minimum content length (50 characters)
+  - Content-Type header validation
+
+- **Sitemap in Skill Templates** 📚
+  - `loadSitemap()` function to load cached sitemap
+  - Sitemap data passed to all template generators
+  - Enables documentation index in generated skills
+
+### Changed
+
+- `/generate-skill` command now reminds users to **restart Claude Code** to load new skills
+- `generate-skill.md` command documentation updated with restart requirement
+- Version bumped to 2.6.5 in package.json and plugin.json
+- `extractAllLinks()` function for comprehensive link extraction from pages
+- Depth tracking in recursive crawl for debugging
+
+### Technical Details
+
+**New Files:**
+- `scripts/registries/squirrelsoft.js` - SquirrelSoft API client
+
+**Modified Files:**
+- `scripts/crawl-links.js` - Recursive BFS crawling implementation
+- `scripts/fetch-docs.js` - Markdown detection, error logging, SquirrelSoft integration
+- `scripts/generate-skill.js` - Generate all templates, sitemap loading
+- `scripts/resolve-docs-url.js` - SquirrelSoft API integration
+- `scripts/error-utils.js` - New error categories
+- `scripts/templates/*.js` - Sitemap parameter support
+- `commands/generate-skill.md` - Restart requirement
+
+## [1.6.0] - 2025-11-18
 
 ### Added - Enhanced Error Recovery 🔄
 
@@ -106,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic recovery without user intervention
   - Bandwidth savings from not re-fetching completed pages
 
-## [1.5.0] - 2025-01-18
+## [1.5.0] - 2025-11-18
 
 ### Added - Incremental Updates 🚀
 
@@ -212,7 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Subsequent updates will benefit from incremental logic
 - Use `--force` flag to bypass incremental updates if needed
 
-## [1.4.0] - 2025-01-18
+## [1.4.0] - 2025-11-18
 
 ### Added - Skill Generation Quality (Complete Implementation) ✨
 
@@ -304,7 +375,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Templates Implemented**: 5/5 (100%)
 - **Analysis Features**: Topics, Code Examples, API Methods, Keywords, Hierarchy
 
-## [1.3.0] - 2025-01-18
+## [1.3.0] - 2025-11-18
 
 ### Added
 - **Comprehensive Input Validation** 🛡️
@@ -350,7 +421,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - URL validation with localhost/private IP blocking
 - Input sanitization and normalization
 
-## [1.2.0] - 2025-01-18
+## [1.2.0] - 2025-11-18
 
 ### Added
 - **Testing Infrastructure** 🎉
@@ -379,7 +450,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added examples for writing new tests
 - Outlined future test expansion plans
 
-## [1.1.0] - 2025-01-18
+## [1.1.0] - 2025-11-18
 
 ### Added
 - **Robots.txt Compliance** ✅
@@ -402,7 +473,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevention of IP bans from aggressive crawling
 - Professional credibility with documentation providers
 
-## [1.0.0] - 2025-01-17
+## [1.0.0] - 2025-11-17
 
 ### Added
 - Initial plugin structure and manifest

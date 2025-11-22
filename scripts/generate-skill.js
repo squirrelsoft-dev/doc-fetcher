@@ -33,6 +33,23 @@ import { generateBestPracticesTemplate } from './templates/best-practices.js';
 
 const program = new Command();
 
+// All available templates
+const ALL_TEMPLATES = ['expert', 'quick-reference', 'migration-guide', 'troubleshooter', 'best-practices'];
+
+/**
+ * Load sitemap from cached docs
+ */
+async function loadSitemap(docsPath) {
+  const sitemapPath = path.join(docsPath, 'sitemap.json');
+  try {
+    const content = await fs.readFile(sitemapPath, 'utf-8');
+    const sitemap = JSON.parse(content);
+    return sitemap.pages || [];
+  } catch (error) {
+    return [];
+  }
+}
+
 /**
  * Generate skill content using analysis and templates
  */
@@ -53,6 +70,10 @@ async function generateSkillContent(library, metadata, docsPath, cacheDir, templ
   log(`  ✓ Analyzed ${analysis.summary.totalPages} pages`, 'info');
   log(`  ✓ Found ${analysis.summary.topicCount} topics, ${analysis.summary.codeExampleCount} examples`, 'info');
 
+  // Load sitemap for documentation index
+  const sitemap = await loadSitemap(docsPath);
+  log(`  ✓ Loaded sitemap with ${sitemap.length} pages`, 'info');
+
   // Generate activation patterns based on analysis
   const activationPatterns = generateActivationPatterns(analysis, library);
 
@@ -65,7 +86,8 @@ async function generateSkillContent(library, metadata, docsPath, cacheDir, templ
     docsPath: docsPath,  // Use absolute path since docs are in user's home directory
     cacheDir,
     analysis,
-    activationPatterns
+    activationPatterns,
+    sitemap  // Add sitemap for documentation index
   };
 
   // Generate content based on template type
@@ -142,7 +164,7 @@ async function generateSkill(library, version, options) {
     library = validateLibraryName(library);
     version = validateVersion(version);
 
-    if (options.template) {
+    if (options.template && options.template !== 'all') {
       options.template = validateTemplate(options.template);
     }
 
@@ -156,9 +178,18 @@ async function generateSkill(library, version, options) {
     throw error;
   }
 
-  const template = options.template || 'expert';
+  // Determine which templates to generate
+  const templatesToGenerate = (!options.template || options.template === 'all')
+    ? ALL_TEMPLATES
+    : [options.template];
 
-  log(`\nGenerating ${template} skill for ${library}${version ? ` v${version}` : ''}...\n`, 'info');
+  const generateAll = templatesToGenerate.length > 1;
+
+  if (generateAll) {
+    log(`\nGenerating all ${templatesToGenerate.length} skill templates for ${library}${version ? ` v${version}` : ''}...\n`, 'info');
+  } else {
+    log(`\nGenerating ${templatesToGenerate[0]} skill for ${library}${version ? ` v${version}` : ''}...\n`, 'info');
+  }
 
   // Load config
   const config = await loadConfig();
@@ -194,50 +225,82 @@ async function generateSkill(library, version, options) {
     throw new Error(`No documentation pages found at ${pagesPath}. The documentation may not have been fetched correctly.`);
   }
 
-  // Generate skill content with analysis
-  const { skillName, content, analysis } = await generateSkillContent(
-    library,
-    metadata,
-    libraryPath,
-    cacheDir,
-    template
-  );
+  // Store results for all generated skills
+  const results = [];
+  let sharedAnalysis = null;
 
-  // Save skill
-  log('[3/3] Saving skill...', 'info');
-  const skillPath = await saveSkill(skillName, content, template);
+  // Generate each template
+  for (let i = 0; i < templatesToGenerate.length; i++) {
+    const template = templatesToGenerate[i];
 
-  // Update metadata to mark skill as generated
+    if (generateAll) {
+      log(`\n[${i + 1}/${templatesToGenerate.length}] Generating ${template} template...`, 'info');
+    }
+
+    // Generate skill content with analysis (reuse analysis for subsequent templates)
+    const { skillName, content, analysis } = await generateSkillContent(
+      library,
+      metadata,
+      libraryPath,
+      cacheDir,
+      template
+    );
+
+    // Store analysis for reuse and metadata update
+    if (!sharedAnalysis) {
+      sharedAnalysis = analysis;
+    }
+
+    // Save skill
+    if (!generateAll) {
+      log('[3/3] Saving skill...', 'info');
+    }
+    const skillPath = await saveSkill(skillName, content, template);
+
+    results.push({
+      skillName,
+      skillPath,
+      template
+    });
+
+    if (generateAll) {
+      log(`  ✓ ${skillName}`, 'info');
+    }
+  }
+
+  // Update metadata to mark skills as generated
   metadata.skill_generated = true;
-  metadata.skill_path = `skills/${skillName}`;
-  metadata.skill_template = template;
+  metadata.skill_templates = templatesToGenerate;
+  metadata.skill_paths = results.map(r => `skills/${r.skillName}`);
   metadata.skill_analysis_summary = {
-    topics: analysis.summary.topicCount,
-    examples: analysis.summary.codeExampleCount,
-    methods: analysis.summary.apiMethodCount,
-    keywords: analysis.summary.keywordCount
+    topics: sharedAnalysis.summary.topicCount,
+    examples: sharedAnalysis.summary.codeExampleCount,
+    methods: sharedAnalysis.summary.apiMethodCount,
+    keywords: sharedAnalysis.summary.keywordCount
   };
 
   const metadataPath = path.join(libraryPath, 'index.json');
   await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
 
-  log(`\n✓ Skill generated successfully!\n`, 'info');
-  log(`  Name: ${skillName}`, 'info');
-  log(`  Template: ${template}`, 'info');
-  log(`  Location: ${skillPath}`, 'info');
-  log(`  Auto-activation: enabled`, 'info');
-  log(`  Analysis: ${analysis.summary.topicCount} topics, ${analysis.summary.codeExampleCount} examples, ${analysis.summary.apiMethodCount} methods\n`, 'info');
+  if (generateAll) {
+    log(`\n✓ All ${results.length} skills generated successfully!\n`, 'info');
+    results.forEach(r => {
+      log(`  - ${r.skillName}: ${r.skillPath}`, 'info');
+    });
+    log(`\n  Analysis: ${sharedAnalysis.summary.topicCount} topics, ${sharedAnalysis.summary.codeExampleCount} examples, ${sharedAnalysis.summary.apiMethodCount} methods\n`, 'info');
+    log(`The skills are now active. Ask me anything about ${library} ${metadata.version}!\n`, 'info');
+  } else {
+    const result = results[0];
+    log(`\n✓ Skill generated successfully!\n`, 'info');
+    log(`  Name: ${result.skillName}`, 'info');
+    log(`  Template: ${result.template}`, 'info');
+    log(`  Location: ${result.skillPath}`, 'info');
+    log(`  Auto-activation: enabled`, 'info');
+    log(`  Analysis: ${sharedAnalysis.summary.topicCount} topics, ${sharedAnalysis.summary.codeExampleCount} examples, ${sharedAnalysis.summary.apiMethodCount} methods\n`, 'info');
+    log(`The skill is now active. Ask me anything about ${library} ${metadata.version}!\n`, 'info');
+  }
 
-  log(`The skill is now active. Ask me anything about ${library} ${metadata.version}!\n`, 'info');
-
-  return {
-    skillName,
-    skillPath,
-    library,
-    version: metadata.version,
-    template,
-    analysis: analysis.summary
-  };
+  return generateAll ? results : results[0];
 }
 
 /**
@@ -248,7 +311,7 @@ program
   .description('Generate a Claude Code skill from cached documentation')
   .argument('<library>', 'Library name (e.g., nextjs, react)')
   .argument('[version]', 'Specific version (defaults to latest)')
-  .option('-t, --template <template>', 'Skill template: expert, quick-reference, migration-guide, troubleshooter, best-practices', 'expert')
+  .option('-t, --template <template>', 'Skill template: expert, quick-reference, migration-guide, troubleshooter, best-practices, or "all" to generate all templates (default: all)')
   .option('-o, --output <path>', 'Custom output path')
   .action(async (library, version, options) => {
     try {

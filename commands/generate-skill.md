@@ -49,7 +49,9 @@ When the user invokes this command, follow these steps:
    - If generation fails: Show error and suggest re-fetching documentation
    - If script not found: Verify the doc-fetcher plugin is installed
 
-5. **Next Steps**: Inform the user that the skill is now available and will automatically activate when working with the library (if auto-activation is configured).
+5. **Next Steps**:
+   - **IMPORTANT**: Tell the user they need to **restart Claude Code** (exit and reopen) to load the newly generated skills
+   - Explain that skills will automatically activate when working with the library once Claude is restarted
 
 ## Important Notes
 

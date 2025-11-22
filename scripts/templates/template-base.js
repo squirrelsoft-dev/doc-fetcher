@@ -307,3 +307,214 @@ export function pluralize(count, singular, plural = null) {
   }
   return `${count} ${plural || singular + 's'}`;
 }
+
+/**
+ * Format documentation reference index (URL → title mapping)
+ * Groups by section and provides local file references
+ * @param {Array} sitemap - Sitemap pages array
+ * @param {string} docsPath - Path to cached docs
+ * @returns {string} Formatted markdown
+ */
+export function formatDocumentationIndex(sitemap, docsPath) {
+  if (!sitemap || sitemap.length === 0) {
+    return '';
+  }
+
+  // Group pages by top-level section
+  const sections = {};
+
+  sitemap.forEach(page => {
+    if (!page.url || !page.title) return;
+
+    // Extract section from URL path
+    const urlPath = page.url.replace(/^https?:\/\/[^/]+/, '');
+    const pathParts = urlPath.split('/').filter(p => p && p !== 'docs');
+    const section = pathParts[0] || 'General';
+
+    if (!sections[section]) {
+      sections[section] = [];
+    }
+
+    sections[section].push({
+      title: page.title,
+      url: page.url,
+      filename: page.filename,
+      size: page.size
+    });
+  });
+
+  let markdown = '';
+
+  // Sort sections alphabetically
+  const sortedSections = Object.keys(sections).sort();
+
+  sortedSections.forEach(section => {
+    const pages = sections[section];
+    const sectionTitle = section.charAt(0).toUpperCase() + section.slice(1).replace(/-/g, ' ');
+
+    markdown += `### ${sectionTitle}\n\n`;
+
+    // Sort pages by title
+    pages.sort((a, b) => a.title.localeCompare(b.title));
+
+    pages.forEach(page => {
+      markdown += `- **${page.title}**\n`;
+      markdown += `  - URL: ${page.url}\n`;
+      markdown += `  - File: \`${docsPath}/pages/${page.filename}\`\n`;
+    });
+
+    markdown += '\n';
+  });
+
+  return markdown;
+}
+
+/**
+ * Format featured code examples with full code
+ * @param {Array} examples - Code examples array
+ * @param {number} maxExamples - Maximum examples to include
+ * @returns {string} Formatted markdown with actual code
+ */
+export function formatFeaturedCodeExamples(examples, maxExamples = 15) {
+  if (!examples || examples.length === 0) {
+    return '';
+  }
+
+  // Prioritize examples by category importance
+  const categoryPriority = [
+    'Usage Example',
+    'Configuration',
+    'API Reference',
+    'Installation',
+    'General Example'
+  ];
+
+  // Score and sort examples
+  const scoredExamples = examples.map(ex => {
+    let score = 0;
+
+    // Priority by category
+    const categoryIndex = categoryPriority.indexOf(ex.category);
+    score += categoryIndex >= 0 ? (categoryPriority.length - categoryIndex) * 10 : 0;
+
+    // Prefer shorter, focused examples (5-30 lines ideal)
+    const lines = ex.lines || ex.code.split('\n').length;
+    if (lines >= 5 && lines <= 30) score += 5;
+    else if (lines < 5) score += 2;
+    else if (lines > 50) score -= 5;
+
+    // Prefer examples with good titles
+    if (ex.title && ex.title.length > 5) score += 3;
+
+    return { ...ex, score };
+  });
+
+  // Sort by score and take top examples
+  scoredExamples.sort((a, b) => b.score - a.score);
+  const featured = scoredExamples.slice(0, maxExamples);
+
+  let markdown = '';
+
+  featured.forEach((example, index) => {
+    const title = example.title || `Example ${index + 1}`;
+    const lang = example.language || 'text';
+
+    markdown += `#### ${title}\n\n`;
+
+    if (example.category) {
+      markdown += `*Category: ${example.category}*\n\n`;
+    }
+
+    // Truncate very long examples
+    let code = example.code;
+    if (code.length > 1500) {
+      code = code.slice(0, 1500) + '\n// ... (truncated)';
+    }
+
+    markdown += `\`\`\`${lang}\n${code}\n\`\`\`\n\n`;
+
+    if (example.sourceUrl) {
+      markdown += `*Source: ${example.sourceUrl}*\n\n`;
+    }
+  });
+
+  return markdown;
+}
+
+/**
+ * Format API quick reference with signatures
+ * @param {Object} apiMethods - API methods from analysis
+ * @param {Array} examples - Code examples for context
+ * @returns {string} Formatted markdown
+ */
+export function formatAPIQuickReference(apiMethods, examples = []) {
+  if (!apiMethods || !apiMethods.byCategory) {
+    return '';
+  }
+
+  let markdown = '';
+
+  // Priority categories
+  const priorityCategories = ['hooks', 'components', 'methods', 'utilities'];
+
+  priorityCategories.forEach(category => {
+    const methods = apiMethods.byCategory[category];
+    if (!methods || methods.length === 0) return;
+
+    const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1);
+    markdown += `### ${categoryTitle}\n\n`;
+
+    methods.slice(0, 15).forEach(method => {
+      markdown += `- \`${method.name}\``;
+
+      // Try to find a usage example for this method
+      const usageExample = examples.find(ex =>
+        ex.code && ex.code.includes(method.name)
+      );
+
+      if (usageExample && usageExample.sourceUrl) {
+        markdown += ` - [see docs](${usageExample.sourceUrl})`;
+      }
+
+      markdown += '\n';
+    });
+
+    if (methods.length > 15) {
+      markdown += `\n*...and ${methods.length - 15} more*\n`;
+    }
+
+    markdown += '\n';
+  });
+
+  return markdown;
+}
+
+/**
+ * Generate compact documentation index (title + file only)
+ * @param {Array} sitemap - Sitemap pages array
+ * @param {string} docsPath - Path to cached docs
+ * @param {number} maxEntries - Maximum entries to show
+ * @returns {string} Formatted markdown
+ */
+export function formatCompactDocIndex(sitemap, docsPath, maxEntries = 50) {
+  if (!sitemap || sitemap.length === 0) {
+    return '';
+  }
+
+  let markdown = '| Topic | Local File |\n';
+  markdown += '|-------|------------|\n';
+
+  const entries = sitemap.slice(0, maxEntries);
+
+  entries.forEach(page => {
+    if (!page.title || !page.filename) return;
+    const title = page.title.length > 40 ? page.title.slice(0, 37) + '...' : page.title;
+    markdown += `| ${title} | \`pages/${page.filename}\` |\n`;
+  });
+
+  if (sitemap.length > maxEntries) {
+    markdown += `\n*...and ${sitemap.length - maxEntries} more pages*\n`;
+  }
+
+  return markdown;
+}

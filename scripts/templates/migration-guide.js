@@ -9,7 +9,9 @@ import {
   generateSkillName,
   formatKeywords,
   formatCodeExample,
-  pluralize
+  pluralize,
+  formatCompactDocIndex,
+  formatFeaturedCodeExamples
 } from './template-base.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -101,10 +103,15 @@ function compareVersions(currentAnalysis, previousAnalysis) {
  * @param {Array} params.activationPatterns - Activation patterns
  * @param {Object} params.previousAnalysis - Previous version analysis (optional)
  * @param {string} params.previousVersion - Previous version string (optional)
+ * @param {Array} params.sitemap - Sitemap pages array
  * @returns {string} Complete skill content
  */
 export async function generateMigrationGuideTemplate(params) {
-  const { library, version, docsPath, cacheDir, analysis, activationPatterns, previousAnalysis = null, previousVersion = null } = params;
+  const { library, version, docsPath, cacheDir, analysis, activationPatterns, previousAnalysis = null, previousVersion = null, sitemap = [] } = params;
+
+  // Filter for migration-related examples
+  const migrationExamples = (analysis.codeExamples?.examples || [])
+    .filter(ex => ex.category === 'Migration' || ex.title?.toLowerCase().includes('migrat') || ex.title?.toLowerCase().includes('upgrade'));
 
   const skillName = generateSkillName(library, version, 'migration-guide');
   const description = `Migration guide for upgrading to ${library} v${version}`;
@@ -128,10 +135,44 @@ export async function generateMigrationGuideTemplate(params) {
     autoActivate: true
   });
 
+  // Filter sitemap for migration/upgrade related pages
+  const migrationPages = sitemap.filter(page =>
+    page.title?.toLowerCase().includes('migrat') ||
+    page.title?.toLowerCase().includes('upgrade') ||
+    page.url?.toLowerCase().includes('migrat') ||
+    page.url?.toLowerCase().includes('upgrade')
+  );
+
   const content = `
 # ${library} Migration Guide: ${fromVersion} → ${version}
 
 This skill helps you upgrade to ${library} version ${version}${comparison.hasComparison ? ` from ${fromVersion}` : ''}.
+
+**IMPORTANT**: When I need detailed information about a specific topic, I should read the cached documentation files directly from \`${docsPath}/pages/\`.
+
+## How to Use This Skill
+
+When answering migration questions about ${library}:
+
+1. **Check the Documentation Index** below to find migration-related doc files
+2. **Read the cached file** using the Read tool: \`${docsPath}/pages/[filename]\`
+3. **Provide accurate migration guidance** based on the documentation
+
+## Migration Documentation Reference
+
+${migrationPages.length > 0 ? formatCompactDocIndex(migrationPages, docsPath, 20) : 'No specific migration pages found. See full documentation index below.'}
+
+## Full Documentation Reference
+
+${formatCompactDocIndex(sitemap, docsPath, 30)}
+
+${migrationExamples.length > 0 ? `
+## Migration Code Examples
+
+These examples show migration patterns from the documentation:
+
+${formatFeaturedCodeExamples(migrationExamples, 5)}
+` : ''}
 
 ${comparison.hasComparison ? `
 ## 🔄 Version Comparison

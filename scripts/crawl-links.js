@@ -344,13 +344,11 @@ export async function crawlLinks(baseUrl, config, robotsChecker = null) {
       urls = urls.slice(0, maxLinks);
     }
 
-    // If we found very few links, try a second-level crawl
-    if (urls.length < 5 && urls.length > 0) {
-      log(`   Few links found, trying second-level crawl...`, 'info');
-      const secondLevelUrls = await crawlSecondLevel(urls.slice(0, 3), baseUrl, config);
-      urls = [...new Set([...urls, ...secondLevelUrls])];
-      log(`   After second-level: ${urls.length} total links`, 'info');
-    }
+    // Always use recursive crawl to discover all pages under the docs path
+    // Start with the base URL plus any initially discovered URLs
+    const seedUrls = [baseUrl, ...urls].filter((v, i, a) => a.indexOf(v) === i); // dedupe
+    log(`   Starting recursive discovery with ${seedUrls.length} seed URLs...`, 'info');
+    urls = await recursiveCrawl(seedUrls, baseUrl, config, robotsChecker);
 
     if (urls.length === 0) {
       return {
@@ -383,44 +381,152 @@ export async function crawlLinks(baseUrl, config, robotsChecker = null) {
 }
 
 /**
- * Perform second-level crawl to discover more links
- * @param {string[]} urls - First-level URLs to crawl
- * @param {string} baseUrl - Original base URL
+ * Perform recursive BFS crawl to discover all documentation pages
+ * @param {string[]} seedUrls - Initial URLs to start crawling from
+ * @param {string} baseUrl - Original base URL (used to determine path prefix)
  * @param {Object} config - Configuration
- * @returns {Promise<string[]>} Additional discovered URLs
+ * @param {Object} [robotsChecker] - RobotsChecker instance (optional)
+ * @returns {Promise<string[]>} All discovered URLs
  */
-async function crawlSecondLevel(urls, baseUrl, config) {
-  const additionalUrls = new Set();
+async function recursiveCrawl(seedUrls, baseUrl, config, robotsChecker = null) {
   const baseUrlObj = new URL(baseUrl);
+  const basePath = baseUrlObj.pathname.replace(/\/$/, '') || '';
 
-  for (const url of urls) {
+  // Track all discovered URLs
+  const discovered = new Set(seedUrls);
+  // Queue for BFS
+  const queue = [...seedUrls];
+  // Track visited URLs (fetched and extracted links from)
+  const visited = new Set();
+
+  // Config limits
+  const maxLinks = config.fallback_strategies?.link_crawl?.max_links || 200;
+  const maxDepth = config.fallback_strategies?.link_crawl?.max_depth || 10;
+  const crawlDelay = config.crawl_delay_ms || 100;
+
+  let depth = 0;
+  let depthBoundary = queue.length; // Track when we move to next depth level
+  let processedInDepth = 0;
+
+  log(`   Starting recursive crawl from ${seedUrls.length} seed URLs`, 'info');
+  log(`   Path prefix: ${basePath || '/'}, max links: ${maxLinks}, max depth: ${maxDepth}`, 'debug');
+
+  while (queue.length > 0 && discovered.size < maxLinks && depth < maxDepth) {
+    const url = queue.shift();
+
+    // Track depth
+    processedInDepth++;
+    if (processedInDepth > depthBoundary) {
+      depth++;
+      depthBoundary = queue.length;
+      processedInDepth = 0;
+      log(`   Depth ${depth}: ${discovered.size} URLs discovered, ${queue.length} in queue`, 'debug');
+    }
+
+    // Skip if already visited
+    if (visited.has(url)) continue;
+    visited.add(url);
+
+    // Check robots.txt
+    if (robotsChecker && !robotsChecker.isAllowed(url)) {
+      continue;
+    }
+
+    // Rate limiting
+    if (visited.size > 1) {
+      await new Promise(resolve => setTimeout(resolve, crawlDelay));
+    }
+
     try {
       const response = await axios.get(url, {
         timeout: config.timeout_ms || 30000,
         headers: {
           'User-Agent': config.user_agent || 'doc-fetcher/1.0'
-        }
+        },
+        maxRedirects: 5,
+        validateStatus: (status) => status === 200
       });
 
-      const extracted = extractNavigationLinks(response.data, url);
+      // Extract all links from this page
+      const extracted = extractAllLinks(response.data, url, baseUrlObj.hostname, basePath);
 
-      for (const link of extracted.links) {
-        // Only add same-domain links
-        try {
-          const linkUrl = new URL(link.url);
-          if (linkUrl.hostname === baseUrlObj.hostname) {
-            additionalUrls.add(link.url);
-          }
-        } catch {
-          // Invalid URL, skip
+      // Add new links to discovered set and queue
+      for (const link of extracted) {
+        if (!discovered.has(link) && discovered.size < maxLinks) {
+          discovered.add(link);
+          queue.push(link);
         }
+      }
+
+      // Progress update every 10 pages
+      if (visited.size % 10 === 0) {
+        log(`   Crawled ${visited.size} pages, discovered ${discovered.size} URLs...`, 'info');
       }
     } catch {
       // Failed to fetch, continue with other URLs
     }
   }
 
-  return Array.from(additionalUrls);
+  log(`   Recursive crawl complete: ${discovered.size} URLs from ${visited.size} pages (depth ${depth})`, 'info');
+
+  return Array.from(discovered);
+}
+
+/**
+ * Extract ALL links from a page that match the path prefix
+ * Unlike extractNavigationLinks, this extracts from the entire page body
+ * @param {string} html - HTML content
+ * @param {string} pageUrl - URL of the current page
+ * @param {string} hostname - Hostname to filter for same-domain
+ * @param {string} pathPrefix - Path prefix to filter (e.g., '/docs')
+ * @returns {string[]} Array of discovered URLs
+ */
+function extractAllLinks(html, pageUrl, hostname, pathPrefix) {
+  const $ = cheerio.load(html);
+  const links = new Set();
+
+  $('a[href]').each((i, elem) => {
+    const href = $(elem).attr('href');
+    if (!href) return;
+
+    // Skip excluded patterns
+    if (EXCLUDE_PATTERNS.some(pattern => pattern.test(href))) {
+      return;
+    }
+
+    // Resolve relative URLs
+    let absoluteUrl;
+    try {
+      absoluteUrl = new URL(href, pageUrl).href;
+    } catch {
+      return;
+    }
+
+    // Parse the absolute URL
+    let linkUrlObj;
+    try {
+      linkUrlObj = new URL(absoluteUrl);
+    } catch {
+      return;
+    }
+
+    // Only include same-domain links
+    if (linkUrlObj.hostname !== hostname) {
+      return;
+    }
+
+    // Only include links that start with the path prefix
+    // This ensures we stay within the docs section
+    if (pathPrefix && !linkUrlObj.pathname.startsWith(pathPrefix)) {
+      return;
+    }
+
+    // Normalize URL (remove fragments, trailing slashes)
+    const normalizedUrl = normalizeUrl(absoluteUrl);
+    links.add(normalizedUrl);
+  });
+
+  return Array.from(links);
 }
 
 /**

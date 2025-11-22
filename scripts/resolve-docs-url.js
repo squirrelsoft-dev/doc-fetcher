@@ -2,10 +2,12 @@
  * Documentation URL Resolver
  *
  * Resolves documentation URLs for packages using multiple strategies:
+ * 0. Query SquirrelSoft API (centralized docs URL cache)
  * 1. Query package registry API (npm, crates.io, PyPI)
  * 2. Check GitHub repository for docs links
  * 3. Web search fallback for packages without registry docs
  * 4. Validate resolved URLs
+ * 5. Report correct URLs back to SquirrelSoft API
  */
 
 import axios from 'axios';
@@ -14,6 +16,7 @@ import path from 'path';
 import { resolveNpmDocs, isGitHubUrl } from './registries/npm.js';
 import { resolveCratesIoDocs } from './registries/crates-io.js';
 import { resolvePyPIDocs } from './registries/pypi.js';
+import { querySquirrelsoft, updateSquirrelsoft } from './registries/squirrelsoft.js';
 import { log } from './utils.js';
 
 /**
@@ -248,15 +251,39 @@ async function searchForLlmsTxt(packageName, homepage) {
     );
   }
 
-  // Check each URL
+  // Check each URL - use GET and validate content is actually llms.txt
   for (const url of urlsToCheck) {
     try {
-      const response = await axios.head(url, {
+      const response = await axios.get(url, {
         timeout: 5000,
-        validateStatus: (status) => status === 200
+        validateStatus: (status) => status === 200,
+        maxContentLength: 100 * 1024, // Limit to 100KB for quick check
+        headers: {
+          'Accept': 'text/plain'
+        }
       });
 
       if (response.status === 200) {
+        const contentType = response.headers['content-type'] || '';
+        const content = typeof response.data === 'string' ? response.data : '';
+
+        // Validate it's not HTML (soft 404 pages)
+        const isHtml = contentType.includes('text/html') ||
+                       content.trim().startsWith('<!DOCTYPE') ||
+                       content.trim().startsWith('<html') ||
+                       content.trim().startsWith('<HTML');
+
+        if (isHtml) {
+          log(`  ✗ ${url} returned HTML, not valid llms.txt`, 'debug');
+          continue;
+        }
+
+        // Validate it looks like a valid llms.txt (should have some text content)
+        if (content.length < 50) {
+          log(`  ✗ ${url} content too short to be valid llms.txt`, 'debug');
+          continue;
+        }
+
         log(`  ✓ Found llms.txt at: ${url}`, 'info');
         // Return the base docs URL, not the llms.txt itself
         return url.replace(/\/llms(-full)?\.txt$/, '') || url.replace(/\/llms\.txt$/, '');
@@ -345,6 +372,8 @@ async function validateUrl(url) {
  * @param {string} packageName - Package name to resolve
  * @param {Object} options - Resolution options
  * @param {string} [options.ecosystem] - Package ecosystem (auto-detected if not provided)
+ * @param {string} [options.version] - Package version for versioned docs
+ * @param {boolean} [options.skipSquirrelsoft] - Skip SquirrelSoft API lookup
  * @param {boolean} [options.skipRegistry] - Skip registry lookup
  * @param {boolean} [options.skipGitHub] - Skip GitHub README check
  * @param {boolean} [options.skipWebSearch] - Skip web search fallback
@@ -354,6 +383,8 @@ async function validateUrl(url) {
 export async function resolveDocsUrl(packageName, options = {}) {
   const {
     ecosystem: providedEcosystem,
+    version,
+    skipSquirrelsoft = false,
     skipRegistry = false,
     skipGitHub = false,
     skipWebSearch = false,
@@ -369,9 +400,42 @@ export async function resolveDocsUrl(packageName, options = {}) {
   let resolvedUrl = null;
   let source = null;
   let registryData = null;
+  let squirrelsoftData = null;
+  let squirrelsoftUrl = null; // Track SquirrelSoft's URL for potential update
 
-  // Step 2: Query package registry
-  if (!skipRegistry) {
+  // Step 0: Query SquirrelSoft API first (centralized docs cache)
+  if (!skipSquirrelsoft) {
+    log(`   Checking SquirrelSoft registry...`, 'info');
+    squirrelsoftData = await querySquirrelsoft(packageName, { ecosystem, version });
+
+    if (squirrelsoftData.success && squirrelsoftData.docsUrl) {
+      squirrelsoftUrl = squirrelsoftData.docsUrl;
+
+      // Validate the URL before using it
+      if (validate) {
+        const isValid = await validateUrl(squirrelsoftData.docsUrl);
+        if (isValid) {
+          resolvedUrl = squirrelsoftData.docsUrl;
+          source = 'squirrelsoft';
+          log(`   ✓ Found in SquirrelSoft: ${resolvedUrl}`, 'info');
+        } else {
+          log(`   ⚠ SquirrelSoft URL not accessible: ${squirrelsoftData.docsUrl}`, 'warn');
+          // Continue to fallback methods
+        }
+      } else {
+        resolvedUrl = squirrelsoftData.docsUrl;
+        source = 'squirrelsoft';
+        log(`   Found in SquirrelSoft: ${resolvedUrl}`, 'info');
+      }
+    } else if (squirrelsoftData.success) {
+      log(`   SquirrelSoft has no docs URL for this package`, 'debug');
+    } else {
+      log(`   SquirrelSoft lookup: ${squirrelsoftData.error || 'not found'}`, 'debug');
+    }
+  }
+
+  // Step 2: Query package registry (if SquirrelSoft didn't provide a valid URL)
+  if (!resolvedUrl && !skipRegistry) {
     registryData = await queryRegistry(packageName, ecosystem);
 
     if (registryData.success) {
@@ -411,7 +475,7 @@ export async function resolveDocsUrl(packageName, options = {}) {
   }
 
   // Step 5: Validate resolved URL
-  if (resolvedUrl && validate) {
+  if (resolvedUrl && validate && source !== 'squirrelsoft') {
     const isValid = await validateUrl(resolvedUrl);
     if (!isValid) {
       log(`   ⚠ Resolved URL is not accessible: ${resolvedUrl}`, 'warn');
@@ -428,6 +492,16 @@ export async function resolveDocsUrl(packageName, options = {}) {
     }
   }
 
+  // Step 6: Report correct URL back to SquirrelSoft if we found a better one
+  if (resolvedUrl && source !== 'squirrelsoft' && squirrelsoftUrl !== resolvedUrl) {
+    // We found a good URL through fallback methods - update SquirrelSoft
+    log(`   Updating SquirrelSoft with discovered URL...`, 'debug');
+    const updateResult = await updateSquirrelsoft(packageName, resolvedUrl, { ecosystem, version });
+    if (updateResult.success) {
+      log(`   ✓ Updated SquirrelSoft registry with correct URL`, 'info');
+    }
+  }
+
   // Return result
   if (resolvedUrl) {
     log(`   ✓ Resolved: ${resolvedUrl} (source: ${source})`, 'info');
@@ -436,7 +510,8 @@ export async function resolveDocsUrl(packageName, options = {}) {
       url: resolvedUrl,
       source,
       ecosystem,
-      registry: registryData
+      registry: registryData,
+      squirrelsoft: squirrelsoftData
     };
   }
 
@@ -446,6 +521,7 @@ export async function resolveDocsUrl(packageName, options = {}) {
     error: `Could not find documentation URL for "${packageName}"`,
     ecosystem,
     registry: registryData,
+    squirrelsoft: squirrelsoftData,
     suggestions: [
       `Try providing a custom URL with --url flag`,
       `Check the package's GitHub repository for documentation links`,

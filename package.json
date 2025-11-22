@@ -1,6 +1,6 @@
 {
     "name": "@squirrelsoft-dev/doc-fetcher",
-    "version": "2.6.1",
+    "version": "2.6.5",
     "description": "Fetch, cache, and version documentation from web sources for Claude Code",
     "main": "scripts/index.js",
     "type": "module",

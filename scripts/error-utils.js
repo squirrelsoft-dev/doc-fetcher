@@ -12,7 +12,9 @@ const ErrorCategory = {
   RATE_LIMIT: 'RATE_LIMIT',      // HTTP 429 - Too Many Requests
   RETRYABLE: 'RETRYABLE',        // Temporary errors (network, 5xx, timeouts)
   PERMANENT: 'PERMANENT',        // Permanent errors (404, 403, invalid URLs)
-  UNKNOWN: 'UNKNOWN'             // Unclassified errors
+  UNKNOWN: 'UNKNOWN',            // Unclassified errors
+  EXTRACTION: 'EXTRACTION',      // Content extraction failures
+  SAVE_ERROR: 'SAVE_ERROR'       // File save failures
 };
 
 /**
@@ -272,7 +274,9 @@ function summarizeErrors(errors) {
       [ErrorCategory.RATE_LIMIT]: 0,
       [ErrorCategory.RETRYABLE]: 0,
       [ErrorCategory.PERMANENT]: 0,
-      [ErrorCategory.UNKNOWN]: 0
+      [ErrorCategory.UNKNOWN]: 0,
+      [ErrorCategory.EXTRACTION]: 0,
+      [ErrorCategory.SAVE_ERROR]: 0
     },
     details: []
   };

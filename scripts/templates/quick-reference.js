@@ -10,7 +10,8 @@ import {
   formatAPIMethodList,
   formatCodeExample,
   formatKeywords,
-  pluralize
+  pluralize,
+  formatCompactDocIndex
 } from './template-base.js';
 
 /**
@@ -21,10 +22,11 @@ import {
  * @param {string} params.docsPath - Path to cached docs
  * @param {Object} params.analysis - Analysis results
  * @param {Array} params.activationPatterns - Activation patterns
+ * @param {Array} params.sitemap - Sitemap pages array
  * @returns {string} Complete skill content
  */
 export function generateQuickReferenceTemplate(params) {
-  const { library, version, docsPath, analysis, activationPatterns } = params;
+  const { library, version, docsPath, analysis, activationPatterns, sitemap = [] } = params;
 
   const skillName = generateSkillName(library, version, 'quick-reference');
   const description = `Quick reference guide for ${library} v${version} - top features and common patterns`;
@@ -61,6 +63,20 @@ export function generateQuickReferenceTemplate(params) {
 # ${library} Quick Reference
 
 Fast lookup guide for ${library} v${version}. This skill provides condensed information about the most commonly used features.
+
+**IMPORTANT**: When I need detailed information about a specific topic, I should read the cached documentation files directly from \`${docsPath}/pages/\`.
+
+## How to Use This Skill
+
+When answering questions about ${library}:
+
+1. **Check the Documentation Index** below to find the relevant doc file
+2. **Read the cached file** using the Read tool: \`${docsPath}/pages/[filename]\`
+3. **Provide quick, accurate answers** based on the documentation
+
+## Documentation Reference
+
+${formatCompactDocIndex(sitemap, docsPath, 30)}
 
 ## 🎯 Top Features
 

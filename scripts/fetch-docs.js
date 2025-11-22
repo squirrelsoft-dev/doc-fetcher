@@ -54,6 +54,75 @@ import { fetchGitHubReadme, formatReadmeAsDoc } from './github-readme.js';
 const program = new Command();
 
 /**
+ * Detect if content is markdown (not HTML) based on URL, content-type, and content inspection
+ * @param {string} url - The URL that was fetched
+ * @param {string} contentType - Content-Type header from response
+ * @param {string} content - The raw content
+ * @returns {boolean} True if content should be treated as raw markdown
+ */
+function isMarkdownContent(url, contentType, content) {
+  // Check URL extension
+  const urlObj = new URL(url);
+  if (urlObj.pathname.endsWith('.md') || urlObj.pathname.endsWith('.markdown') || urlObj.pathname.endsWith('.txt')) {
+    return true;
+  }
+
+  // Check Content-Type header
+  if (contentType) {
+    const ct = contentType.toLowerCase();
+    if (ct.includes('text/markdown') || ct.includes('text/x-markdown') || ct.includes('text/plain')) {
+      return true;
+    }
+    // If it's explicitly HTML, it's not markdown
+    if (ct.includes('text/html')) {
+      return false;
+    }
+  }
+
+  // Inspect content - if it looks like HTML, it's not markdown
+  if (typeof content === 'string') {
+    const trimmed = content.trim();
+    if (trimmed.startsWith('<!DOCTYPE') ||
+        trimmed.startsWith('<html') ||
+        trimmed.startsWith('<HTML') ||
+        trimmed.startsWith('<?xml')) {
+      return false;
+    }
+
+    // If content starts with markdown patterns, it's likely markdown
+    // Common patterns: # heading, - list, * list, > quote, ``` code block
+    if (/^(#+ |[-*>] |```|\[.*\]\()/.test(trimmed)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Extract title from markdown content (first # heading)
+ * @param {string} markdown - The markdown content
+ * @returns {string} The title or 'Untitled'
+ */
+function extractMarkdownTitle(markdown) {
+  if (typeof markdown !== 'string') return 'Untitled';
+
+  // Look for first # heading
+  const match = markdown.match(/^#\s+(.+)$/m);
+  if (match) {
+    return match[1].trim();
+  }
+
+  // Look for first line if it looks like a title
+  const firstLine = markdown.trim().split('\n')[0];
+  if (firstLine && firstLine.length < 100 && !firstLine.startsWith('-') && !firstLine.startsWith('*')) {
+    return firstLine.replace(/^[#\s]+/, '').trim() || 'Untitled';
+  }
+
+  return 'Untitled';
+}
+
+/**
  * Fetch HTML content from URL with enhanced error handling
  * Supports HTTP status detection, adaptive backoff, and categorized errors
  */
@@ -78,7 +147,8 @@ async function fetchHtml(url, config, retryCount = 0) {
     return {
       success: true,
       html: response.data,
-      statusCode: response.status
+      statusCode: response.status,
+      contentType: response.headers['content-type'] || ''
     };
   } catch (error) {
     // Categorize the error
@@ -271,13 +341,37 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
         return null;
       }
 
-      // Extract content
-      const extractResult = extractContent(fetchResult.html, url);
+      // Check if content is markdown (not HTML)
+      let markdown, metadata;
+      if (isMarkdownContent(url, fetchResult.contentType, fetchResult.html)) {
+        // Content is already markdown - use it directly
+        markdown = fetchResult.html;
+        metadata = {
+          title: extractMarkdownTitle(fetchResult.html),
+          url,
+          extractedAt: new Date().toISOString(),
+          framework: 'markdown'
+        };
+      } else {
+        // Extract content from HTML
+        const extractResult = extractContent(fetchResult.html, url);
 
-      if (!extractResult.success) {
-        results.failed++;
-        progress.increment();
-        return null;
+        if (!extractResult.success) {
+          results.failed++;
+          results.failedPages.push({
+            url,
+            error: extractResult.error || 'Content extraction failed',
+            errorCategory: 'EXTRACTION',
+            statusCode: null,
+            retryable: false,
+            suggestedAction: 'Check if page structure changed or is incompatible'
+          });
+          progress.increment();
+          return null;
+        }
+
+        markdown = extractResult.markdown;
+        metadata = extractResult.metadata;
       }
 
       // Save page
@@ -285,15 +379,15 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
         const pageInfo = await savePage(
           libraryPath,
           url,
-          extractResult.markdown,
-          extractResult.metadata
+          markdown,
+          metadata
         );
 
         results.successful++;
         results.totalSize += pageInfo.size;
         const pageData = {
           url,
-          title: extractResult.metadata.title,
+          title: metadata.title,
           filename: pageInfo.filename,
           size: pageInfo.size,
           ...urlMetadata  // Include sitemap metadata (lastmod, changefreq, priority)
@@ -318,6 +412,14 @@ async function crawlPages(urlEntries, libraryPath, config, robotsChecker, option
       } catch (error) {
         log(`  ✗ Failed to save page ${url}: ${error.message}`, 'error');
         results.failed++;
+        results.failedPages.push({
+          url,
+          error: error.message || 'Failed to save page',
+          errorCategory: 'SAVE_ERROR',
+          statusCode: null,
+          retryable: true,
+          suggestedAction: 'Retry the crawl or check disk space'
+        });
         progress.increment();
         return null;
       }
@@ -428,16 +530,27 @@ async function fetchDocumentation(library, version, options) {
   let docUrl = options.url || resumeCheckpoint?.metadata?.sourceUrl;
 
   // If no URL provided, use the resolver to find documentation
+  let resolvedData = null;
   if (!docUrl) {
     log('\\n[0/7] Resolving documentation URL...', 'info');
     const resolved = await resolveDocsUrl(library, {
       ecosystem: options.ecosystem,
+      version: version,
       validate: true
     });
 
     if (resolved.success) {
       docUrl = resolved.url;
+      resolvedData = resolved;
       log(`   Resolved from: ${resolved.source}`, 'info');
+
+      // Log bonus metadata from SquirrelSoft if available
+      if (resolved.squirrelsoft?.llmsTxtUrl) {
+        log(`   ✓ AI docs available: ${resolved.squirrelsoft.llmsTxtUrl}`, 'info');
+      }
+      if (resolved.squirrelsoft?.sitemapUrl) {
+        log(`   ✓ Sitemap available: ${resolved.squirrelsoft.sitemapUrl}`, 'debug');
+      }
     } else {
       // Fall back to old behavior as last resort
       docUrl = `https://${library}.dev/docs`;
@@ -468,6 +581,7 @@ async function fetchDocumentation(library, version, options) {
   let pages = [];
   let sourceType = null;
   let sourceUrl = null;
+  let crawlResults = null;
 
   if (aiDocsResult.found) {
     log(`✓ Found ${aiDocsResult.type} (${formatBytes(aiDocsResult.size)})`, 'info');
@@ -509,7 +623,7 @@ async function fetchDocumentation(library, version, options) {
       }
 
       // Crawl all URLs from llms.txt
-      const crawlResults = await crawlPages(aiDocsResult.extractedUrls, libraryPath, config, robotsChecker, {
+      crawlResults = await crawlPages(aiDocsResult.extractedUrls, libraryPath, config, robotsChecker, {
         enableCheckpoint,
         checkpointData: resumeCheckpoint
       });
@@ -565,7 +679,7 @@ async function fetchDocumentation(library, version, options) {
 
       // 3. Crawl pages
       log('\\n[4/7] Crawling documentation pages...', 'info');
-      const crawlResults = await crawlPages(urlEntries, libraryPath, config, robotsChecker, {
+      crawlResults = await crawlPages(urlEntries, libraryPath, config, robotsChecker, {
         enableCheckpoint,
         checkpointData: resumeCheckpoint
       });
@@ -609,7 +723,7 @@ async function fetchDocumentation(library, version, options) {
 
         // Crawl discovered pages
         log('\\n[4/7] Crawling discovered pages...', 'info');
-        const crawlResults = await crawlPages(linkResult.urls, libraryPath, config, robotsChecker, {
+        crawlResults = await crawlPages(linkResult.urls, libraryPath, config, robotsChecker, {
           enableCheckpoint,
           checkpointData: resumeCheckpoint
         });
@@ -673,6 +787,38 @@ async function fetchDocumentation(library, version, options) {
   if (sourceType === 'llms.txt' && pages.length > 0) {
     const pagePath = path.join(libraryPath, 'pages', pages[0].filename);
     await fs.writeFile(pagePath, pages[0].content, 'utf-8');
+  }
+
+  // Save crawl errors log if there were any failures
+  if (crawlResults?.failedPages?.length > 0) {
+    const errorSummary = summarizeErrors(crawlResults.failedPages.map(fp => ({
+      url: fp.url,
+      error: {
+        category: fp.errorCategory,
+        message: fp.error,
+        statusCode: fp.statusCode,
+        retryable: fp.retryable,
+        suggestedAction: fp.suggestedAction
+      }
+    })));
+
+    const errorLog = {
+      generatedAt: new Date().toISOString(),
+      totalFailed: crawlResults.failedPages.length,
+      summary: errorSummary.byCategory,
+      errors: crawlResults.failedPages.map(fp => ({
+        url: fp.url,
+        statusCode: fp.statusCode,
+        errorCategory: fp.errorCategory,
+        error: fp.error,
+        retryable: fp.retryable,
+        suggestedAction: fp.suggestedAction
+      }))
+    };
+
+    const errorLogPath = path.join(libraryPath, 'crawl-errors.json');
+    await fs.writeFile(errorLogPath, JSON.stringify(errorLog, null, 2), 'utf-8');
+    log(`  Saved error log: ${crawlResults.failedPages.length} failed URLs`, 'warn');
   }
 
   // 5. Save metadata

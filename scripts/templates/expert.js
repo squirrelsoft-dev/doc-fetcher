@@ -11,7 +11,11 @@ import {
   formatCodeExamplesByCategory,
   formatKeywords,
   formatStatistics,
-  pluralize
+  pluralize,
+  formatDocumentationIndex,
+  formatFeaturedCodeExamples,
+  formatAPIQuickReference,
+  formatCompactDocIndex
 } from './template-base.js';
 
 /**
@@ -22,10 +26,11 @@ import {
  * @param {string} params.docsPath - Path to cached docs
  * @param {Object} params.analysis - Analysis results
  * @param {Array} params.activationPatterns - Activation patterns
+ * @param {Array} params.sitemap - Sitemap pages array
  * @returns {string} Complete skill content
  */
 export function generateExpertTemplate(params) {
-  const { library, version, docsPath, analysis, activationPatterns } = params;
+  const { library, version, docsPath, analysis, activationPatterns, sitemap = [] } = params;
 
   const skillName = generateSkillName(library, version, 'expert');
   const description = `Comprehensive expert knowledge of ${library} version ${version}`;
@@ -48,40 +53,44 @@ export function generateExpertTemplate(params) {
 
 I am an expert on ${library} version ${version}, with comprehensive knowledge extracted from the official documentation. I have deep understanding of all APIs, patterns, and best practices.
 
+**IMPORTANT**: When I need detailed information about a specific topic, I should read the cached documentation files directly from \`${docsPath}/pages/\`.
+
 ## Documentation Coverage
 
 ${formatStatistics(analysis)}
 
-## What I Know
+## How to Use This Skill
 
-### Main Topics
+When answering questions about ${library}:
+
+1. **Check the Documentation Index** below to find the relevant doc file
+2. **Read the cached file** using the Read tool: \`${docsPath}/pages/[filename]\`
+3. **Provide accurate, version-specific answers** based on the documentation
+
+## Documentation Reference Index
+
+This index maps topics to their local cached files. Use this to find and read specific documentation.
+
+${formatCompactDocIndex(sitemap, docsPath, 100)}
+
+## Featured Code Examples
+
+These are key examples extracted from the documentation:
+
+${formatFeaturedCodeExamples(analysis.codeExamples?.examples || [], 12)}
+
+## API Quick Reference
+
+${formatAPIQuickReference(analysis.apiMethods, analysis.codeExamples?.examples || [])}
+
+## Main Topics
 
 I have comprehensive knowledge of the following areas:
 
 ${formatTopicHierarchy(analysis.topics?.hierarchy || {}, 15)}
 
-${analysis.apiMethods && analysis.apiMethods.uniqueCount > 0 ? `
-### API Methods & Functions
-
-I know ${pluralize(analysis.apiMethods.uniqueCount, 'API method', 'API methods')} across different categories:
-
-${formatAPIMethodsByCategory(analysis.apiMethods.byCategory, 8)}
-` : ''}
-
-${analysis.codeExamples && analysis.codeExamples.totalCount > 0 ? `
-### Code Examples
-
-I have access to ${pluralize(analysis.codeExamples.totalCount, 'code example', 'code examples')} covering:
-
-${Object.entries(analysis.codeExamples.categories || {})
-  .sort((a, b) => b[1].count - a[1].count)
-  .slice(0, 10)
-  .map(([category, data]) => `- **${category}**: ${data.count} examples`)
-  .join('\n')}
-` : ''}
-
 ${analysis.keywords && analysis.keywords.topKeywords.length > 0 ? `
-### Key Concepts
+## Key Concepts
 
 Important concepts and features I can help with:
 
@@ -105,13 +114,6 @@ ${formatKeywords(analysis.keywords.topKeywords, 30)}
 - **Configuration**: Guide proper setup and configuration
 - **Testing**: Assist with writing tests for ${library} code
 - **Migration**: Help migrate from older versions or other libraries
-
-### Learning & Teaching
-
-- **Concept Explanation**: Explain how ${library} features work
-- **Examples**: Provide relevant code examples for any use case
-- **Comparisons**: Compare different approaches and patterns
-- **Best Practices**: Share recommended patterns and anti-patterns
 
 ## Usage Guidelines
 
