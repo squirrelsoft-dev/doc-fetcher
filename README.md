@@ -54,66 +54,6 @@ Doc Fetcher uses a **global cache architecture** - documentation and skills are 
 - Skills work everywhere - generate once, use in any project
 - Project directories stay clean - no large `.claude/docs` folders
 
-## Recent Updates
-
-### v2.7.0 (2025-11-22)
-
-#### Added
-- **Incremental Updates for All Source Types** - Previously only sitemap-based docs supported incremental updates. Now all source types benefit:
-  - **llms.txt sources**: Re-fetches llms.txt, compares extracted URL lists, only fetches new/changed pages
-  - **link-crawl sources**: Re-crawls navigation links, compares with cached URLs, fetches only new pages
-  - **github-readme sources**: Checks repository `updated_at` timestamp, skips re-fetch if unchanged
-  - Typical bandwidth savings: 90-99% on documentation updates
-
-#### Changed
-- Refactored `update-docs.js` with source-type-specific comparison routing
-- Added CLI guards to all scripts to prevent execution when imported as modules
-- `incrementalUpdate()` now preserves existing metadata (skill_generated, framework, etc.)
-
-### v2.6.5 (2025-11-22)
-
-#### Added
-- **Recursive BFS Crawling** - Comprehensive page discovery for documentation sites
-  - Replaces limited second-level crawl with full recursive breadth-first search
-  - Discovers all pages under the docs path prefix automatically
-  - Configurable max depth and max links limits
-  - Progress reporting during crawl
-
-- **SquirrelSoft API Integration** - Centralized documentation URL resolution
-  - Queries SquirrelSoft API first for known documentation URLs
-  - Falls back to package registry resolution (npm, PyPI, crates.io)
-  - Reports successful crawls back to improve future resolutions
-  - Includes bonus metadata (llms.txt URLs, sitemap URLs)
-
-- **Raw Markdown Support** - Direct handling of non-HTML documentation
-  - Detects markdown files (`.md`, `.txt`) and plain text content
-  - Skips HTML extraction for raw markdown responses
-  - Extracts titles from markdown headings
-
-- **Enhanced Error Tracking** - Detailed crawl failure logging
-  - New `crawl-errors.json` file with categorized failures
-  - Error categories: EXTRACTION, SAVE_ERROR added
-  - Suggested actions for each error type
-  - Error summary by category
-
-- **Generate All Templates** - Create all skill templates at once
-  - Default behavior now generates all 5 templates (expert, quick-reference, migration-guide, troubleshooter, best-practices)
-  - Use `--template <name>` for single template generation
-  - Shared analysis across templates for efficiency
-
-- **llms.txt Validation** - Better detection of soft 404 pages
-  - Uses GET instead of HEAD to validate content
-  - Checks for HTML content masquerading as text
-  - Validates minimum content length
-
-#### Changed
-- `/generate-skill` command now reminds users to **restart Claude Code** to load new skills
-- Sitemap now included in skill templates for documentation index
-
-### v2.0.0 - v2.6.0
-
-See [CHANGELOG.md](CHANGELOG.md) for full version history.
-
 ## Installation
 
 ### Via Claude Code Marketplace
@@ -843,6 +783,34 @@ MIT © Squirrelsoft Dev Tools
 - [Claude Code](https://code.claude.ai) - Official Claude Code CLI
 - [llms.txt](https://llmstxt.org) - AI-friendly documentation standard
 - [Squirrelsoft Marketplace](https://github.com/squirrelsoft-dev/squirrelsoft-marketplace) - Plugin marketplace
+
+## Recent Updates
+
+### v2.7.0 (2025-11-22)
+
+#### Added
+- **Incremental Updates for All Source Types** - Previously only sitemap-based docs supported incremental updates. Now all source types benefit:
+  - **llms.txt sources**: Re-fetches llms.txt, compares extracted URL lists, only fetches new/changed pages
+  - **link-crawl sources**: Re-crawls navigation links, compares with cached URLs, fetches only new pages
+  - **github-readme sources**: Checks repository `updated_at` timestamp, skips re-fetch if unchanged
+  - Typical bandwidth savings: 90-99% on documentation updates
+
+#### Changed
+- Refactored `update-docs.js` with source-type-specific comparison routing
+- Added CLI guards to all scripts to prevent execution when imported as modules
+- `incrementalUpdate()` now preserves existing metadata (skill_generated, framework, etc.)
+
+### v2.6.5 (2025-11-22)
+
+#### Added
+- **Recursive BFS Crawling** - Comprehensive page discovery for documentation sites
+- **SquirrelSoft API Integration** - Centralized documentation URL resolution
+- **Raw Markdown Support** - Direct handling of non-HTML documentation
+- **Enhanced Error Tracking** - Detailed crawl failure logging
+- **Generate All Templates** - Create all skill templates at once
+- **llms.txt Validation** - Better detection of soft 404 pages
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 ---
 
