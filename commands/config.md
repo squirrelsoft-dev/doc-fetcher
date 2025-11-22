@@ -23,6 +23,8 @@ When the user invokes this command, follow these steps:
    - `--path`: Show the config file path
    - `--restore`: Restore configuration from a backup (see step 6)
 
+1.5. **INSTALL DEPENDENCIES**: If ~/.claude/plugins/cache/doc-fetcher/node_modules doesn't exist then execute `cd ~/.claude/plugins/cache/doc-fetcher && npm install` after installation change the directory back to the project workspace root.
+
 2. **Run Config Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/config.js $ARGUMENTS`
    - The script handles:

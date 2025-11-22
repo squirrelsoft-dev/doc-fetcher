@@ -20,6 +20,8 @@ When the user invokes this command, follow these steps:
    - If no arguments: prompt user to specify a library, use `--all`, or use `--project`
    - Valid flags: `--all` (update all cached docs), `--project` (update project dependencies), `--force` (force re-fetch)
 
+1.5. **INSTALL DEPENDENCIES**: If ~/.claude/plugins/cache/doc-fetcher/node_modules doesn't exist then execute `cd ~/.claude/plugins/cache/doc-fetcher && npm install` after installation change the directory back to the project workspace root.
+
 2. **Run Update Command**:
    - Execute: `node ~/.claude/plugins/cache/doc-fetcher/scripts/update-docs.js $ARGUMENTS`
    - It will check `~/.claude/docs` for cached documentation
