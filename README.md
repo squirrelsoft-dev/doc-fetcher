@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-2.6.5-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -55,6 +55,20 @@ Doc Fetcher uses a **global cache architecture** - documentation and skills are 
 - Project directories stay clean - no large `.claude/docs` folders
 
 ## Recent Updates
+
+### v2.7.0 (2025-11-22)
+
+#### Added
+- **Incremental Updates for All Source Types** - Previously only sitemap-based docs supported incremental updates. Now all source types benefit:
+  - **llms.txt sources**: Re-fetches llms.txt, compares extracted URL lists, only fetches new/changed pages
+  - **link-crawl sources**: Re-crawls navigation links, compares with cached URLs, fetches only new pages
+  - **github-readme sources**: Checks repository `updated_at` timestamp, skips re-fetch if unchanged
+  - Typical bandwidth savings: 90-99% on documentation updates
+
+#### Changed
+- Refactored `update-docs.js` with source-type-specific comparison routing
+- Added CLI guards to all scripts to prevent execution when imported as modules
+- `incrementalUpdate()` now preserves existing metadata (skill_generated, framework, etc.)
 
 ### v2.6.5 (2025-11-22)
 

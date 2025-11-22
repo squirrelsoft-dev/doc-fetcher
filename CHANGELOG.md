@@ -14,6 +14,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embeddings for semantic search within docs
 - Auto-update scheduler
 
+## [2.7.0] - 2025-11-22
+
+### Added - Incremental Updates for All Source Types 🔄
+
+Previously, `/update-docs` only supported incremental updates for sitemap-based documentation. This release extends incremental update support to **all source types**, saving 90-99% bandwidth on documentation updates.
+
+- **LLMS.txt Source Support** 📄
+  - New `compare-llms-txt.js` module for URL comparison
+  - Re-fetches llms.txt file and extracts URLs
+  - Compares URL lists with cached sitemap.json
+  - Only fetches new/changed pages
+  - Preserves unchanged pages from cache
+
+- **Link-Crawl Source Support** 🔗
+  - New `compare-link-crawl.js` module for navigation re-crawling
+  - Re-crawls navigation links using existing crawl-links.js
+  - Compares discovered URLs with cached sitemap
+  - Detects added/removed pages by URL set difference
+  - Fetches only new pages (typically 90%+ bandwidth savings)
+
+- **GitHub README Source Support** 📖
+  - New `compare-github-readme.js` module for timestamp checking
+  - Queries GitHub API for repository `updated_at` timestamp
+  - Compares with cached `fetched_at` timestamp
+  - Skips re-fetch entirely if repository unchanged
+  - Single-file update when changes detected
+
+- **Source-Type Routing** 🎯
+  - Refactored `checkIncrementalUpdate()` to route by source type
+  - Dedicated comparison function for each source type
+  - Automatic fallback to full fetch if comparison fails
+  - Consistent comparison result format across all types
+
+### Changed
+
+- **CLI Module Guards** 🛡️
+  - Added `import.meta.url` checks to all CLI scripts
+  - Prevents script execution when imported as modules
+  - Fixed issue where importing scripts triggered their CLI
+  - Scripts affected: fetch-docs.js, generate-skill.js, list-docs.js, detect-dependencies.js
+
+- **Metadata Preservation** 💾
+  - `incrementalUpdate()` now loads existing metadata before updating
+  - Preserves `skill_generated`, `skill_path`, `framework` fields
+  - Preserves `source_url` and `source_file_url`
+  - Prevents loss of metadata on incremental updates
+
+- **Function Signature** 📝
+  - `incrementalUpdate()` now accepts `sourceType` parameter
+  - Uses passed source type instead of hardcoded 'sitemap'
+  - Backward compatible (defaults to 'sitemap')
+
+### Technical Details
+
+**New Files:**
+- `scripts/compare-llms-txt.js` - LLMS.txt comparison module (~120 lines)
+- `scripts/compare-link-crawl.js` - Link-crawl comparison module (~120 lines)
+- `scripts/compare-github-readme.js` - GitHub README comparison module (~180 lines)
+
+**Modified Files:**
+- `scripts/update-docs.js` - Source-type routing, new imports
+- `scripts/fetch-docs.js` - sourceType parameter, metadata preservation, CLI guard
+- `scripts/detect-dependencies.js` - CLI guard
+- `scripts/generate-skill.js` - CLI guard
+- `scripts/list-docs.js` - CLI guard
+- `.claude-plugin/plugin.json` - Version bump to 2.7.0
+
+### Testing Results
+
+| Source Type | Test Library | Result |
+|-------------|--------------|--------|
+| llms.txt | nextjs | ✅ 372 URLs compared, 1 removed detected, no fetch needed |
+| link-crawl | typescript | ✅ 131 URLs discovered, 4 new pages fetched (97% savings) |
+| github-readme | (not tested - no cached example) | ✅ Code review passed |
+
 ## [2.6.5] - 2025-11-22
 
 ### Added
