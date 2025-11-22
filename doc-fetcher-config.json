@@ -6,7 +6,7 @@
   "remote_sync": false,
   "remote_sync_url": "https://squirrelsoft.dev/api/docs",
   "crawl_delay_ms": 1000,
-  "max_pages_per_fetch": 500,
+  "max_pages_per_fetch": 5000,
   "frameworks_priority": [
     "llms.txt",
     "claude.txt",

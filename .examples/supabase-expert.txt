@@ -1,0 +1,302 @@
+use the supabase-latest-expert to explain how to implement supabase
+auth with mfa in nextjs
+
+⏺ I'll use the supabase-latest-expert skill to explain how to
+  implement Supabase authentication with MFA in Next.js.
+
+> The "supabase-latest-expert" skill is running
+
+⏺ Now with the Supabase expertise active, let me explain how to
+  implement Supabase authentication with MFA (Multi-Factor
+  Authentication) in Next.js.
+
+  Overview
+
+  Supabase supports Multi-Factor Authentication (MFA) with two primary
+   methods:
+  1. TOTP (Time-based One-Time Password) - Authenticator apps like
+  Google Authenticator, Authy
+  2. Phone/SMS - Text message verification
+
+  Setup Process
+
+  1. Enable MFA in Supabase Dashboard
+
+  First, enable MFA in your Supabase project:
+  - Go to Authentication → Providers
+  - Enable the MFA factors you want (TOTP and/or Phone)
+
+  2. Install Supabase Client
+
+  npm install @supabase/supabase-js
+
+  3. Initialize Supabase Client
+
+  For Next.js App Router:
+
+  // utils/supabase/client.ts
+  import { createBrowserClient } from '@supabase/ssr'
+
+  export const createClient = () =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+  For Next.js Pages Router:
+
+  // utils/supabase.ts
+  import { createClient } from '@supabase/supabase-js'
+
+  export const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  MFA Implementation Flow
+
+  Step 1: User Sign-In (First Factor)
+
+  // Sign in with email/password
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: 'user@example.com',
+    password: 'password123'
+  })
+
+  // Check if MFA is required
+  if (data?.user && !error) {
+    const { data: factors } = await supabase.auth.mfa.listFactors()
+    if (factors && factors.totp.length > 0) {
+      // User has MFA enabled, prompt for verification
+    }
+  }
+
+  Step 2: Enroll TOTP Factor (First-Time Setup)
+
+  // Enroll a new TOTP factor
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: 'totp',
+    friendlyName: 'My Authenticator App' // Optional
+  })
+
+  if (data) {
+    // data.totp.qr_code - QR code for user to scan
+    // data.totp.secret - Secret key for manual entry
+    // data.totp.uri - Full URI for authenticator apps
+    // data.id - Factor ID (save this)
+
+    // Display QR code to user
+    const qrCode = data.totp.qr_code
+    const factorId = data.id
+  }
+
+  Step 3: Verify TOTP Factor (Complete Enrollment)
+
+  // After user scans QR code and gets a code from their authenticator
+   app
+  const { data, error } = await supabase.auth.mfa.verify({
+    factorId: factorId, // From enrollment step
+    challengeId: challengeId, // From enrollment step
+    code: '123456' // Code from user's authenticator app
+  })
+
+  if (!error) {
+    // MFA is now enabled for this user
+    console.log('MFA enrolled successfully')
+  }
+
+  Step 4: Challenge & Verify (During Login)
+
+  // After successful first-factor authentication, challenge for MFA
+  const { data: challengeData, error: challengeError } =
+    await supabase.auth.mfa.challenge({
+      factorId: factorId // The enrolled factor ID
+    })
+
+  if (challengeData) {
+    const challengeId = challengeData.id
+
+    // Prompt user for MFA code, then verify
+    const { data, error } = await supabase.auth.mfa.verify({
+      factorId: factorId,
+      challengeId: challengeId,
+      code: '123456' // Code from user's authenticator app
+    })
+
+    if (!error) {
+      // User is fully authenticated with MFA
+      // Session is now valid
+    }
+  }
+
+  Complete Next.js App Router Example
+
+  // app/login/page.tsx
+  'use client'
+
+  import { useState } from 'react'
+  import { createClient } from '@/utils/supabase/client'
+  import QRCode from 'qrcode'
+
+  export default function LoginPage() {
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [mfaCode, setMfaCode] = useState('')
+    const [qrCodeUrl, setQrCodeUrl] = useState('')
+    const [factorId, setFactorId] = useState('')
+    const [challengeId, setChallengeId] = useState('')
+    const [step, setStep] = useState<'login' | 'enroll' |
+  'verify'>('login')
+
+    const supabase = createClient()
+
+    const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      if (error) {
+        console.error('Login error:', error)
+        return
+      }
+
+      // Check if user has MFA enabled
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+
+      if (factors && factors.totp.length > 0) {
+        // User has MFA, challenge them
+        const factor = factors.totp[0]
+        const { data: challengeData } = await
+  supabase.auth.mfa.challenge({
+          factorId: factor.id
+        })
+
+        if (challengeData) {
+          setFactorId(factor.id)
+          setChallengeId(challengeData.id)
+          setStep('verify')
+        }
+      } else {
+        // No MFA enrolled, prompt enrollment
+        await enrollMFA()
+      }
+    }
+
+    const enrollMFA = async () => {
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp'
+      })
+
+      if (data) {
+        // Generate QR code
+        const qrCode = await QRCode.toDataURL(data.totp.uri)
+        setQrCodeUrl(qrCode)
+        setFactorId(data.id)
+        setStep('enroll')
+      }
+    }
+
+    const handleMFAVerify = async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      const { data, error } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeId || undefined,
+        code: mfaCode
+      })
+
+      if (!error) {
+        // Successfully authenticated with MFA
+        window.location.href = '/dashboard'
+      } else {
+        console.error('MFA verification error:', error)
+      }
+    }
+
+    if (step === 'enroll') {
+      return (
+        <div>
+          <h2>Set Up Two-Factor Authentication</h2>
+          <p>Scan this QR code with your authenticator app:</p>
+          {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" />}
+          <form onSubmit={handleMFAVerify}>
+            <input
+              type="text"
+              placeholder="Enter code from app"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+            />
+            <button type="submit">Verify & Enable MFA</button>
+          </form>
+        </div>
+      )
+    }
+
+    if (step === 'verify') {
+      return (
+        <div>
+          <h2>Enter Your Authentication Code</h2>
+          <form onSubmit={handleMFAVerify}>
+            <input
+              type="text"
+              placeholder="6-digit code"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+            />
+            <button type="submit">Verify</button>
+          </form>
+        </div>
+      )
+    }
+
+    return (
+      <div>
+        <h2>Login</h2>
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit">Login</button>
+        </form>
+      </div>
+    )
+  }
+
+  Key MFA Methods
+
+  - mfa.enroll() - Enroll a new MFA factor
+  - mfa.challenge() - Create a challenge for verification
+  - mfa.verify() - Verify an MFA code
+  - mfa.listFactors() - List all enrolled factors for a user
+  - mfa.unenroll() - Remove an MFA factor
+  - mfa.getAuthenticatorAssuranceLevel() - Check current assurance
+  level
+
+  Additional Considerations
+
+  1. Assurance Levels: Supabase uses AAL (Authenticator Assurance
+  Level)
+    - AAL1: Single-factor authentication
+    - AAL2: Multi-factor authentication
+  2. Protected Routes: Check AAL level in middleware:
+  const { data: { session } } = await supabase.auth.getSession()
+  const aal = session?.aal // 'aal1' or 'aal2'
+
+  3. Recovery Codes: Generate backup codes for users who lose access
+  to their MFA device
+  4. Phone MFA: Similar flow but uses SMS instead of TOTP
+
+  This comprehensive approach covers the complete MFA implementation
+  flow in Next.js with Supabase!
