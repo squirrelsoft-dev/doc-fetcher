@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -380,18 +380,38 @@ Detects project dependencies and suggests fetching relevant docs.
 - Go (go modules)
 - Rust (cargo)
 
+### `doc-fetcher`
+
+User-facing skill that activates on natural language requests to fetch documentation.
+
+**Auto-activates on:**
+- "Get the latest documentation for [library]"
+- "Fetch docs for [library]"
+- "Download [library] documentation"
+- "Update my [library] documentation"
+
+**What it does:**
+- Parses library name and version from user request
+- Spawns the `doc-crawler` agent to handle the workflow
+- Reports results with pages cached and skills generated
+
 ## Agents
 
 ### `doc-crawler`
 
-Advanced documentation crawler for complex or non-standard sites.
+Orchestration agent that finds documentation URLs and manages the complete fetch-to-skill workflow.
+
+**Capabilities:**
+- **URL Discovery**: Uses SquirrelSoft API, package registries, and web search to find documentation
+- **Slash Command Integration**: Orchestrates `/doc-fetcher:fetch-docs`, `/doc-fetcher:generate-skill`, etc.
+- **Error Handling**: Retries with alternative URLs when fetches fail
+- **Complete Workflow**: Fetches docs, generates skills, and reports results
 
 **Use cases:**
-- Custom/non-standard documentation frameworks
-- JavaScript-heavy sites requiring rendering
-- Authenticated documentation
-- Multi-source documentation
-- Failed standard crawls
+- "Get the latest Next.js documentation" - finds URL automatically
+- Custom documentation sites with non-standard URLs
+- Unknown libraries not in registries
+- Multi-step documentation workflows
 
 ## Skill Templates
 
@@ -807,29 +827,26 @@ MIT © Squirrelsoft Dev Tools
 
 ## Recent Updates
 
-### v2.7.0 (2025-11-22)
+### v2.9.0 (2025-11-22)
 
 #### Added
-- **Incremental Updates for All Source Types** - Previously only sitemap-based docs supported incremental updates. Now all source types benefit:
-  - **llms.txt sources**: Re-fetches llms.txt, compares extracted URL lists, only fetches new/changed pages
-  - **link-crawl sources**: Re-crawls navigation links, compares with cached URLs, fetches only new pages
-  - **github-readme sources**: Checks repository `updated_at` timestamp, skips re-fetch if unchanged
-  - Typical bandwidth savings: 90-99% on documentation updates
+- **New `doc-fetcher` Skill** - Auto-activates on natural language requests like "Get the latest documentation for Next.js"
+  - Parses library name and version from user request
+  - Spawns the `doc-crawler` agent to handle the complete workflow
+  - Reports results with pages cached and skills generated
 
 #### Changed
-- Refactored `update-docs.js` with source-type-specific comparison routing
-- Added CLI guards to all scripts to prevent execution when imported as modules
-- `incrementalUpdate()` now preserves existing metadata (skill_generated, framework, etc.)
+- **Refactored `doc-crawler` Agent (v3.0.0)** - Major update to use slash commands and intelligent URL discovery
+  - Now uses `/doc-fetcher:fetch-docs`, `/doc-fetcher:generate-skill` instead of direct script calls
+  - Added `WebSearch` capability for finding documentation URLs
+  - New 4-strategy URL discovery: user-provided → resolver script → web search → URL patterns
+  - Comprehensive workflow documentation for fetch-to-skill pipeline
 
-### v2.6.5 (2025-11-22)
+### v2.8.0 (2025-11-22)
 
 #### Added
-- **Recursive BFS Crawling** - Comprehensive page discovery for documentation sites
-- **SquirrelSoft API Integration** - Centralized documentation URL resolution
-- **Raw Markdown Support** - Direct handling of non-HTML documentation
-- **Enhanced Error Tracking** - Detailed crawl failure logging
-- **Generate All Templates** - Create all skill templates at once
-- **llms.txt Validation** - Better detection of soft 404 pages
+- **Automatic Config Backups** - Every configuration change creates a timestamped backup
+- **Config Restore Command** - New `--restore` flag for `/doc-fetcher:config` command
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 

@@ -1,6 +1,6 @@
 {
     "name": "doc-fetcher",
-    "version": "2.8.0",
+    "version": "2.9.0",
     "description": "Fetches, caches, and versions documentation from web sources to provide accurate, version-specific context for AI coding agents",
     "author": {
         "name": "Squirrelsoft Dev Tools",
@@ -11,7 +11,8 @@
         "./skills/doc-indexer",
         "./skills/llms-txt-finder",
         "./skills/doc-skill-generator",
-        "./skills/dependency-detector"
+        "./skills/dependency-detector",
+        "./skills/doc-fetcher"
     ],
     "commands": [
         "./commands/fetch-docs.md",

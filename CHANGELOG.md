@@ -14,6 +14,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embeddings for semantic search within docs
 - Auto-update scheduler
 
+## [2.9.0] - 2025-11-22
+
+### Added - Doc-Fetcher Skill & Agent Refactor
+
+- **New `doc-fetcher` Skill**
+  - User-facing skill that auto-activates on natural language documentation requests
+  - Activation patterns: "get docs for", "fetch documentation", "download docs", "update documentation"
+  - Parses library name and version from user request
+  - Spawns the `doc-crawler` agent to handle the complete workflow
+  - Reports results including pages cached and skills generated
+  - Located at `skills/doc-fetcher/SKILL.md`
+
+- **Refactored `doc-crawler` Agent (v3.0.0)**
+  - Complete rewrite to use slash commands instead of direct script calls
+  - Now uses `/doc-fetcher:fetch-docs`, `/doc-fetcher:generate-skill`, `/doc-fetcher:list-docs`, `/doc-fetcher:update-docs`
+  - Added `WebSearch` to tool restrictions for intelligent URL discovery
+  - Added `SlashCommand` to tool restrictions for command execution
+
+- **4-Strategy URL Discovery System**
+  - **Strategy A**: User-provided URL (use directly)
+  - **Strategy B**: `resolve-docs-url.js` script (SquirrelSoft API + package registries)
+  - **Strategy C**: Web search fallback for unknown libraries
+  - **Strategy D**: Common URL pattern matching (library.dev, library.io, etc.)
+  - Decision table for when to use each strategy
+
+### Changed
+
+- **Agent Architecture**
+  - Agent now orchestrates via slash commands rather than direct Bash calls
+  - Cleaner separation between skill (user interface) and agent (orchestration)
+  - Enhanced error handling with URL fallback strategies
+
+- **Plugin Manifest**
+  - Added `./skills/doc-fetcher` to skills array in `plugin.json`
+  - Version bumped to 2.9.0
+
+### Technical Details
+
+**New Files:**
+- `skills/doc-fetcher/SKILL.md` - New user-facing skill (~100 lines)
+
+**Modified Files:**
+- `agents/doc-crawler.md` - Complete refactor (~350 lines, v2.0.0 → v3.0.0)
+- `.claude-plugin/plugin.json` - Added skill, version bump
+- `README.md` - Updated version badge, skills section, agents section, recent updates
+
 ## [2.8.0] - 2025-11-22
 
 ### Added - Configuration Backup & Restore 💾
