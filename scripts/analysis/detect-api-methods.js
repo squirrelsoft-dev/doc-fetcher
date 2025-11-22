@@ -104,7 +104,7 @@ function extractMethodsFromCode(code, language) {
     case 'c#':
       // Java/C# patterns
       const javaMatches = code.matchAll(API_PATTERNS.javaMethod);
-      for (const match of matches) {
+      for (const match of javaMatches) {
         if (match[1]) methods.add(match[1]);
       }
       break;
