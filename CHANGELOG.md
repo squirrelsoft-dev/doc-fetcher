@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embeddings for semantic search within docs
 - Auto-update scheduler
 
+## [2.8.0] - 2025-11-22
+
+### Added - Configuration Backup & Restore 💾
+
+- **Automatic Config Backups**
+  - Every configuration change now creates a timestamped backup
+  - Backups stored in `~/.claude/doc-fetcher/` (separate from plugin cache)
+  - Backup filename format: `doc-fetcher-config.YYYY-MM-DDTHH-MM-SS-MMMZ.json`
+  - Console feedback shows backup filename on each save
+
+- **Config Restore Command**
+  - New `--restore` flag for `/doc-fetcher:config` command
+  - Lists all available backups with timestamps
+  - Interactive selection via numbered list
+  - Restores selected backup to active configuration
+
+### Changed
+
+- **config.js**
+  - Added `getBackupDir()` function returning `~/.claude/doc-fetcher`
+  - Added `createBackup()` function for timestamped backups
+  - Updated `saveConfig()` to automatically backup before saving
+
+- **commands/config.md**
+  - Added `--restore` to argument hints
+  - Added step 6 with restore workflow instructions
+  - Added `AskUserQuestion` to allowed tools for interactive restore
+  - Updated examples and important notes
+
+### Technical Details
+
+**Modified Files:**
+- `scripts/config.js` - Backup logic, new imports (os)
+- `commands/config.md` - Restore workflow documentation
+- `.claude-plugin/plugin.json` - Version bump to 2.8.0
+- `README.md` - Version badge update
+
 ## [2.7.0] - 2025-11-22
 
 ### Added - Incremental Updates for All Source Types 🔄

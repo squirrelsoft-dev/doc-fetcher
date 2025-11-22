@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
@@ -59,7 +59,8 @@ Doc Fetcher uses a **global cache architecture** - documentation and skills are 
 ### Via Claude Code Marketplace
 
 ```bash
-/plugin install squirrelsoft-dev/doc-fetcher
+/plugin marketplace add squirrelsoft-dev/squirrelsoft-marketplace
+/plugin install doc-fetcher@squirrelsoft-dev
 ```
 
 ### Manual Installation
@@ -493,6 +494,26 @@ All templates use advanced analysis to extract:
 This ensures skills contain actual, relevant information from the cached documentation rather than generic templates.
 
 ## Configuration
+
+Manage configuration with the `/doc-fetcher:config` command:
+
+```bash
+# Show current settings
+/doc-fetcher:config --show
+
+# Change a setting
+/doc-fetcher:config --set crawl_delay_ms 2000
+
+# Reset to defaults
+/doc-fetcher:config --reset
+
+# Restore from backup
+/doc-fetcher:config --restore
+```
+
+**Automatic Backups**: Every config change creates a timestamped backup in `~/.claude/doc-fetcher/`. Use `--restore` to recover any previous configuration.
+
+### Configuration Options
 
 Create or edit `doc-fetcher-config.json` in your plugin directory:
 

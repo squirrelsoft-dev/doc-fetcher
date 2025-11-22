@@ -1,6 +1,6 @@
 {
     "name": "doc-fetcher",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "description": "Fetches, caches, and versions documentation from web sources to provide accurate, version-specific context for AI coding agents",
     "author": {
         "name": "Squirrelsoft Dev Tools",
@@ -17,7 +17,8 @@
         "./commands/fetch-docs.md",
         "./commands/update-docs.md",
         "./commands/list-docs.md",
-        "./commands/generate-skill.md"
+        "./commands/generate-skill.md",
+        "./commands/config.md"
     ],
     "agents": [
         "./agents/doc-crawler.md"
