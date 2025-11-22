@@ -2,7 +2,7 @@
 
 > Fetch, cache, and version documentation from web sources to provide accurate, version-specific context for AI coding agents.
 
-[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
+[![Version](https://img.shields.io/badge/version-2.9.1-blue.svg)](https://github.com/squirrelsoft-dev/doc-fetcher)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-purple.svg)](https://code.claude.ai)
 
