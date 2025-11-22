@@ -24,6 +24,9 @@ import {
   loadCachedSitemap,
   formatComparisonSummary
 } from './compare-sitemaps.js';
+import { compareLlmsTxt } from './compare-llms-txt.js';
+import { compareLinkCrawl } from './compare-link-crawl.js';
+import { compareGithubReadme } from './compare-github-readme.js';
 import { parseSitemap } from './parse-sitemap.js';
 import { RobotsChecker } from './robots-checker.js';
 import {
@@ -35,7 +38,59 @@ import {
 const program = new Command();
 
 /**
+ * Check for sitemap-based incremental updates
+ * @param {string} libraryPath - Path to library cache
+ * @param {Object} existing - Existing cached library metadata
+ * @param {Object} config - Configuration object
+ * @returns {Promise<Object|null>} Comparison results or null if can't do incremental
+ */
+async function checkSitemapUpdate(libraryPath, existing, config) {
+  const cachedSitemap = await loadCachedSitemap(libraryPath);
+
+  if (!cachedSitemap) {
+    log('No cached sitemap found - will do full fetch', 'debug');
+    return null;
+  }
+
+  // Fetch new sitemap from source
+  log('[1/3] Fetching latest sitemap...', 'info');
+  const docUrl = existing.metadata.source_url;
+
+  const robotsChecker = new RobotsChecker(docUrl, config);
+  await robotsChecker.init();
+  const robotsSitemaps = robotsChecker.getSitemaps();
+
+  const sitemapResult = await parseSitemap(docUrl, config, robotsChecker, robotsSitemaps);
+
+  // Build new sitemap structure from fullEntries
+  const newSitemap = {
+    pages: sitemapResult.fullEntries.map(entry => ({
+      url: entry.loc,
+      lastmod: entry.lastmod || null,
+      changefreq: entry.changefreq || null,
+      priority: entry.priority || null
+    }))
+  };
+
+  // Compare sitemaps
+  log('[2/3] Comparing with cached version...', 'info');
+  const comparison = compareSitemaps(cachedSitemap, newSitemap);
+
+  // Display comparison summary
+  log(formatComparisonSummary(comparison), 'info');
+
+  return {
+    comparison,
+    urlEntries: sitemapResult.fullEntries,
+    robotsChecker,
+    libraryPath,
+    sourceType: 'sitemap'
+  };
+}
+
+/**
  * Check for incremental updates and return comparison results
+ * Routes to source-type-specific comparison functions
  * @param {string} library - Library name
  * @param {Object} existing - Existing cached library metadata
  * @param {Object} config - Configuration object
@@ -43,56 +98,74 @@ const program = new Command();
  */
 async function checkIncrementalUpdate(library, existing, config) {
   try {
-    // Load cached sitemap
     const cacheDir = config.cache_directory || getCacheDir();
     const libraryPath = getLibraryPath(cacheDir, library, existing.version);
-    const cachedSitemap = await loadCachedSitemap(libraryPath);
+    const sourceType = existing.metadata.source_type;
+    const sourceUrl = existing.metadata.source_url;
 
-    if (!cachedSitemap) {
-      log('No cached sitemap found - will do full fetch', 'debug');
-      return null;
+    log(`Source type: ${sourceType}`, 'debug');
+
+    // Initialize robots checker for sources that need it
+    let robotsChecker = null;
+    if (sourceType === 'sitemap' || sourceType === 'llms.txt' || sourceType === 'link-crawl') {
+      robotsChecker = new RobotsChecker(sourceUrl, config);
+      await robotsChecker.init();
     }
 
-    // Only sitemap-based documentation supports incremental updates
-    if (existing.metadata.source_type !== 'sitemap') {
-      log('Source type is not sitemap - will do full fetch', 'debug');
-      return null;
+    // Route to source-type-specific comparison
+    switch (sourceType) {
+      case 'sitemap':
+        return await checkSitemapUpdate(libraryPath, existing, config);
+
+      case 'llms.txt': {
+        const result = await compareLlmsTxt(libraryPath, sourceUrl, config, robotsChecker);
+        if (result) {
+          return {
+            comparison: result.comparison,
+            urlEntries: result.urlEntries,
+            robotsChecker,
+            libraryPath,
+            sourceType: 'llms.txt',
+            llmsTxtResult: result.llmsTxtResult
+          };
+        }
+        return null;
+      }
+
+      case 'link-crawl': {
+        const result = await compareLinkCrawl(libraryPath, sourceUrl, config, robotsChecker);
+        if (result) {
+          return {
+            comparison: result.comparison,
+            urlEntries: result.urlEntries,
+            robotsChecker,
+            libraryPath,
+            sourceType: 'link-crawl',
+            crawlResult: result.crawlResult
+          };
+        }
+        return null;
+      }
+
+      case 'github-readme': {
+        const result = await compareGithubReadme(libraryPath, sourceUrl, existing.metadata, config);
+        if (result) {
+          return {
+            comparison: result.comparison,
+            robotsChecker: null,
+            libraryPath,
+            sourceType: 'github-readme',
+            github: result.github,
+            repoInfo: result.repoInfo
+          };
+        }
+        return null;
+      }
+
+      default:
+        log(`Unknown source type: ${sourceType} - will do full fetch`, 'warn');
+        return null;
     }
-
-    // Fetch new sitemap from source
-    log('[1/3] Fetching latest sitemap...', 'info');
-    const docUrl = existing.metadata.source_url;
-
-    const robotsChecker = new RobotsChecker(docUrl, config);
-    await robotsChecker.init();
-    const robotsSitemaps = robotsChecker.getSitemaps();
-
-    const sitemapResult = await parseSitemap(docUrl, config, robotsChecker, robotsSitemaps);
-
-    // Build new sitemap structure from fullEntries
-    const newSitemap = {
-      pages: sitemapResult.fullEntries.map(entry => ({
-        url: entry.loc,
-        lastmod: entry.lastmod || null,
-        changefreq: entry.changefreq || null,
-        priority: entry.priority || null
-      }))
-    };
-
-    // Compare sitemaps
-    log('[2/3] Comparing with cached version...', 'info');
-    const comparison = compareSitemaps(cachedSitemap, newSitemap);
-
-    // Display comparison summary
-    log(formatComparisonSummary(comparison), 'info');
-
-    return {
-      comparison,
-      newSitemap,
-      sitemapResult,
-      robotsChecker,
-      libraryPath
-    };
 
   } catch (error) {
     log(`Incremental update check failed: ${error.message}`, 'warn');
@@ -161,16 +234,26 @@ async function updateDocs(library, options) {
       const incrementalResult = await checkIncrementalUpdate(library, existing, config);
 
       if (incrementalResult && incrementalResult.comparison.hasChanges) {
-        // Perform incremental update
-        result = await incrementalUpdate(
-          library,
-          existing.version,
-          incrementalResult.sitemapResult.fullEntries,
-          incrementalResult.comparison,
-          incrementalResult.libraryPath,
-          config,
-          incrementalResult.robotsChecker
-        );
+        // Handle different source types
+        if (incrementalResult.sourceType === 'github-readme') {
+          // GitHub README is a single file - just re-fetch it
+          log('\\nRefetching GitHub README...', 'info');
+          result = await fetchDocumentation(library, null, {
+            url: existing.metadata.source_url
+          });
+        } else {
+          // Perform incremental update for multi-page sources
+          result = await incrementalUpdate(
+            library,
+            existing.version,
+            incrementalResult.urlEntries,
+            incrementalResult.comparison,
+            incrementalResult.libraryPath,
+            config,
+            incrementalResult.robotsChecker,
+            incrementalResult.sourceType
+          );
+        }
       } else if (incrementalResult && !incrementalResult.comparison.hasChanges) {
         // No changes detected
         log(`\\n✓ ${library} is already up to date\\n`, 'info');

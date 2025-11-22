@@ -172,9 +172,11 @@ program
     }
   });
 
-// Verify plugin dependencies are installed
-await verifyDependencies('list-docs');
-
-program.parse();
+// Only run CLI if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  // Verify plugin dependencies are installed
+  await verifyDependencies('list-docs');
+  program.parse();
+}
 
 export default listDocs;

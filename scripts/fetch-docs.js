@@ -17,6 +17,7 @@ import {
   ensureDir,
   saveMetadata,
   saveSitemap,
+  loadMetadata,
   log,
   sleep,
   formatBytes,
@@ -882,14 +883,15 @@ async function fetchDocumentation(library, version, options) {
  * Perform incremental update - fetch only changed pages and merge with existing cache
  * @param {string} library - Library name
  * @param {string} version - Version
- * @param {Array} urlEntries - Full URL entries from sitemap
- * @param {Object} comparison - Comparison results from compare-sitemaps
+ * @param {Array} urlEntries - Full URL entries from source
+ * @param {Object} comparison - Comparison results from compare module
  * @param {string} libraryPath - Path to library cache
  * @param {Object} config - Configuration
  * @param {Object} robotsChecker - RobotsChecker instance
+ * @param {string} [sourceType='sitemap'] - Source type (sitemap, llms.txt, link-crawl)
  * @returns {Promise<Object>} Update results
  */
-export async function incrementalUpdate(library, version, urlEntries, comparison, libraryPath, config, robotsChecker) {
+export async function incrementalUpdate(library, version, urlEntries, comparison, libraryPath, config, robotsChecker, sourceType = 'sitemap') {
   const { modified, added, unchanged } = comparison;
 
   // Build set of URLs that need fetching
@@ -939,20 +941,23 @@ export async function incrementalUpdate(library, version, urlEntries, comparison
     ...crawlResults.pages
   ];
 
-  // Update metadata
+  // Load existing metadata to preserve important fields
+  const existingMetadata = await loadMetadata(libraryPath) || {};
+
+  // Update metadata while preserving existing fields
   const totalSize = await getDirSize(libraryPath);
   const metadata = {
     library,
     version: version || 'latest',
-    source_url: config.source_url || libraryPath,
+    source_url: existingMetadata.source_url || config.source_url || libraryPath,
     fetched_at: new Date().toISOString(),
-    source_type: 'sitemap',
-    source_file_url: null,
+    source_type: sourceType,
+    source_file_url: existingMetadata.source_file_url || null,
     page_count: allPages.length,
     total_size_bytes: totalSize,
-    framework: 'unknown',
-    skill_generated: false,
-    skill_path: null,
+    framework: existingMetadata.framework || 'unknown',
+    skill_generated: existingMetadata.skill_generated || false,
+    skill_path: existingMetadata.skill_path || null,
     last_update_stats: {
       pages_checked: comparison.stats.total,
       pages_unchanged: unchanged.length,
@@ -1020,9 +1025,11 @@ program
     }
   });
 
-// Verify plugin dependencies are installed
-await verifyDependencies('fetch-docs');
-
-program.parse();
+// Only run CLI if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  // Verify plugin dependencies are installed
+  await verifyDependencies('fetch-docs');
+  program.parse();
+}
 
 export default fetchDocumentation;

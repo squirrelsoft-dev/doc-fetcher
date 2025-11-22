@@ -326,9 +326,11 @@ program
     }
   });
 
-// Verify plugin dependencies are installed
-await verifyDependencies('generate-skill');
-
-program.parse();
+// Only run CLI if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  // Verify plugin dependencies are installed
+  await verifyDependencies('generate-skill');
+  program.parse();
+}
 
 export default generateSkill;

@@ -544,6 +544,9 @@ program
     }
   });
 
-program.parse();
+// Only run CLI if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program.parse();
+}
 
 export default detectDependencies;
